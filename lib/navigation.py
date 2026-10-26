@@ -211,17 +211,20 @@ def handle_player_stop(info_hash, name=None, watched=None, added=False, initial_
         return
 
     stop_action = settings.get_on_playback_stop_action()
-    if stop_action == settings.PlaybackStopAction.IGNORE:
-        return
+    if stop_action != settings.PlaybackStopAction.IGNORE:
+        sleep(int(initial_delay * 1000))
+        start_time = time.time()
+        while getCondVisibility("Window.IsActive(busydialog)") and not 0 < listing_timeout < time.time() - start_time:
+            sleep(100)
 
-    sleep(int(initial_delay * 1000))
-    start_time = time.time()
-    while getCondVisibility("Window.IsActive(busydialog)") and not 0 < listing_timeout < time.time() - start_time:
-        sleep(100)
+        if (stop_action == settings.PlaybackStopAction.DELETE
+                or Dialog().yesno(ADDON_NAME, name + "\n" + translate(30241))):
+            remove_torrent_files(info_hash)
+            return
 
-    if (stop_action == settings.PlaybackStopAction.DELETE
-            or Dialog().yesno(ADDON_NAME, name + "\n" + translate(30241))):
-        remove_torrent_files(info_hash)
+    if settings.stop_on_exit():
+        # Kept for later, but no downloading or seeding in the background
+        api.pause_torrent(info_hash)
 
 
 def remove_torrent_files(info_hash):
@@ -486,7 +489,11 @@ def play_file(path, file_id=None, index=None, buffer=True):
 def play_info_hash(info_hash, file_id=None, buffer=True):
     global play_torrent
     play_torrent = info_hash
-    if not api.torrent_status(info_hash).has_metadata:
+    status = api.torrent_status(info_hash)
+    if status.paused:
+        # Stopped when an earlier play ended (or when Kodi started)
+        api.resume_torrent(info_hash)
+    if not status.has_metadata:
         wait_for_metadata(info_hash)
 
     if file_id is not None and file_id not in [f.id for f in api.files(info_hash, status=False)]:

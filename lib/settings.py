@@ -67,6 +67,10 @@ def get_unstarted_percent():
     return get_int_setting("unstarted_percent")
 
 
+def stop_on_exit():
+    return get_boolean_setting("stop_on_exit")
+
+
 def delete_watched():
     return get_boolean_setting("delete_watched")
 

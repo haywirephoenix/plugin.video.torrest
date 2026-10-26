@@ -388,6 +388,10 @@ msgid "Total"
 msgstr ""
 
 # Plugin
+msgctxt "#30107"
+msgid "Stop kept torrents when playback stops"
+msgstr ""
+
 msgctxt "#30200"
 msgid "Insert file or URL"
 msgstr ""
