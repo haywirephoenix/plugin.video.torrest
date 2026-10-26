@@ -19,7 +19,7 @@ from lib.dialog import DialogInsert
 from lib.kodi import ADDON_PATH, ADDON_NAME, translate, notification, set_logger, refresh, show_picture, \
     busy_dialog, close_busy_dialog
 from lib.kodi_formats import is_music, is_picture, is_video, is_text
-from lib.play_status import PlayStatus, STATE_STARTING, STATE_BUFFERING, STATE_PLAYING
+from lib.play_status import PlayStatus, STATE_STARTING, STATE_BUFFERING, STATE_PLAYING, skin_osd_enabled
 from lib.player import TorrestPlayer
 from lib.prebuffer import PreBuffer
 from lib.torrest.api import Torrest, TorrestError, STATUS_SEEDING, STATUS_PAUSED, STATUS_QUEUED
@@ -646,10 +646,13 @@ def play(info_hash, file_id):
         status.clear()
         handle_player_stop(info_hash, name=name, watched=watched)
 
+    # The skin shows the download status in its own OSD: no overlay, publish it instead
+    skin_osd = skin_osd_enabled()
     try:
         with TorrestPlayer(
                 text_handler=(lambda: get_status_labels(info_hash) + (name,))
-                if settings.show_status_overlay() else None,
+                if settings.show_status_overlay() and not skin_osd else None,
+                download_status_handler=(lambda: api.torrent_status(info_hash)) if skin_osd else None,
                 on_start_handler=lambda: status.playing(translate(30250)),
                 on_close_handler=on_close,
         ) as player:

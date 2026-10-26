@@ -5,6 +5,7 @@ import time
 import xbmc
 
 from lib.overlay import OverlayText
+from lib.play_status import is_downloading, publish_download, clear_download
 
 
 def _execute_callback(callback):
@@ -112,10 +113,13 @@ class Player(object):
 
 
 class TorrestPlayer(Player):
-    def __init__(self, text_handler=None, on_start_handler=None, on_close_handler=None):
+    def __init__(self, text_handler=None, on_start_handler=None, on_close_handler=None, download_status_handler=None):
         super(TorrestPlayer, self).__init__()
         self._stopped = False
         self._text_handler = text_handler
+        # Returns the playing torrent's status, published for the skin's OSD (see lib/play_status.py)
+        self._download_status_handler = download_status_handler
+        self._download_thread = None
         self._on_start_handler = on_start_handler
         self._on_close_handler = on_close_handler
         self._overlay = self._overlay_thread = None
@@ -129,6 +133,10 @@ class TorrestPlayer(Player):
             self._overlay_thread = threading.Thread(target=self._overlay_updater)
             self._overlay_thread.daemon = True
             self._overlay_thread.start()
+        if self._download_status_handler:
+            self._download_thread = threading.Thread(target=self._download_publisher)
+            self._download_thread.daemon = True
+            self._download_thread.start()
 
     def on_playback_paused(self):
         if self._overlay:
@@ -158,6 +166,23 @@ class TorrestPlayer(Player):
                 break
         self._overlay.close()
 
+    def _download_publisher(self):
+        try:
+            while not self._stopped:
+                try:
+                    status = self._download_status_handler()
+                except Exception as e:
+                    logging.debug("Failed to get the download status: %s", e)
+                else:
+                    if is_downloading(status) and status.progress < 100:
+                        publish_download(status.progress, status.download_rate, status.peers)
+                    else:
+                        clear_download()
+                if self._monitor.waitForAbort(1):
+                    break
+        finally:
+            clear_download()
+
     def __enter__(self):
         return self
 
@@ -166,4 +191,6 @@ class TorrestPlayer(Player):
         if self._overlay:
             self._overlay_thread.join()
             self._overlay.close()
+        if self._download_thread:
+            self._download_thread.join()
         return False

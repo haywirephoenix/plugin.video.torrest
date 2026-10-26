@@ -1,6 +1,10 @@
 """
 Play status for skins, through Home window (10000) properties.
 
+During playback, a skin that sets "ultra.torrent.osd" to "1" gets the download status as
+"torrest.download.*" properties (see publish_download) instead of Torrest's overlay and
+background progress dialog.
+
 A skin that draws its own buffering UI sets "ultra.torrent.ui" to "1"; while it is set Torrest
 shows none of its own buffering/progress dialogs. Either way, while a play starts and buffers
 Torrest keeps the "torrest.*" properties below up to date, and a skin can cancel the play by
@@ -15,8 +19,14 @@ import xbmc
 import xbmcgui
 
 from lib.kodi import WINDOW_HOME
+from lib.torrest.api import STATUS_FINISHED, STATUS_SEEDING, STATUS_PAUSED
+from lib.utils import sizeof_fmt
 
 SKIN_UI_PROPERTY = "ultra.torrent.ui"
+SKIN_OSD_PROPERTY = "ultra.torrent.osd"
+DOWNLOAD_PROGRESS_PROPERTY = "torrest.download.progress"
+DOWNLOAD_SPEED_PROPERTY = "torrest.download.speed"
+DOWNLOAD_PEERS_PROPERTY = "torrest.download.peers"
 CANCEL_PROPERTY = "torrest.cancel"
 STATE_PROPERTY = "torrest.state"
 # Which play owns the properties, so a play that ends late doesn't clear a newer play's status
@@ -34,6 +44,30 @@ FAILED_CLEAR_DELAY = 5
 
 def skin_ui_enabled():
     return xbmcgui.Window(WINDOW_HOME).getProperty(SKIN_UI_PROPERTY) == "1"
+
+
+def skin_osd_enabled():
+    return xbmcgui.Window(WINDOW_HOME).getProperty(SKIN_OSD_PROPERTY) == "1"
+
+
+def is_downloading(status):
+    return status.state not in (STATUS_FINISHED, STATUS_SEEDING, STATUS_PAUSED) and not status.paused
+
+
+def publish_download(progress, download_rate, peers=None):
+    home = xbmcgui.Window(WINDOW_HOME)
+    home.setProperty(DOWNLOAD_PROGRESS_PROPERTY, str(max(0, min(100, int(progress)))))
+    home.setProperty(DOWNLOAD_SPEED_PROPERTY, sizeof_fmt(download_rate) + "/s")
+    if peers is None:
+        home.clearProperty(DOWNLOAD_PEERS_PROPERTY)
+    else:
+        home.setProperty(DOWNLOAD_PEERS_PROPERTY, str(peers))
+
+
+def clear_download():
+    home = xbmcgui.Window(WINDOW_HOME)
+    for key in (DOWNLOAD_PROGRESS_PROPERTY, DOWNLOAD_SPEED_PROPERTY, DOWNLOAD_PEERS_PROPERTY):
+        home.clearProperty(key)
 
 
 def rate_fmt(num):
