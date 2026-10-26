@@ -224,11 +224,19 @@ def handle_player_stop(info_hash, name=None, watched=None, added=False, initial_
 
     if settings.stop_on_exit():
         # Kept for later, but no downloading or seeding in the background
-        api.pause_torrent(info_hash)
+        try:
+            api.pause_torrent(info_hash)
+        except TorrestError as e:
+            logging.debug("Failed to pause %s: %s", info_hash, e)
 
 
 def remove_torrent_files(info_hash):
-    api.remove_torrent(info_hash, delete=True)
+    try:
+        api.remove_torrent(info_hash, delete=True)
+    except TorrestError as e:
+        # Already removed, e.g. by another play's stop handler for the same torrent
+        logging.debug("Failed to remove %s: %s", info_hash, e)
+        return
     current_folder = getInfoLabel("Container.FolderPath")
     if current_folder == plugin.url_for(torrent_files, info_hash):
         executebuiltin("Action(Back)")
