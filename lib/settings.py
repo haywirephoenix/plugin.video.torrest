@@ -75,6 +75,10 @@ def stop_when_complete():
     return get_boolean_setting("stop_when_complete")
 
 
+def stop_at_startup():
+    return get_boolean_setting("stop_at_startup")
+
+
 def delete_watched():
     return get_boolean_setting("delete_watched")
 

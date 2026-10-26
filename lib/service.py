@@ -189,6 +189,20 @@ class DaemonMonitor(xbmc.Monitor):
             self.onSettingsChanged()
         except DaemonTimeoutError:
             logging.error("Timed out waiting for daemon")
+            return
+        if self._enabled and settings.stop_at_startup():
+            self._stop_leftovers()
+
+    def _stop_leftovers(self):
+        """Pauses the torrents the daemon restored as active from the last session."""
+        api = Torrest("127.0.0.1", self._daemon.get_config("port"))
+        try:
+            for torrent in api.torrents():
+                if not torrent.status.paused:
+                    logging.info("Stopping torrent left from the last session: %s", torrent.name)
+                    api.pause_torrent(torrent.info_hash)
+        except requests.exceptions.ConnectionError:
+            logging.error("Failed to stop torrents left from the last session")
 
     def stop(self):
         self._daemon.stop()
