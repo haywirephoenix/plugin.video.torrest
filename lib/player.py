@@ -43,6 +43,10 @@ class Player(object):
         except RuntimeError:
             pass
 
+    def is_tracking(self):
+        """False to stop following playback without the stop callback (another play took over)."""
+        return True
+
     def handle_events(self, url=None, timeout=60, period=0.2):
         start_time = time.time()
         while True:
@@ -69,6 +73,9 @@ class Player(object):
 
         _execute_callback(self.on_playback_started)
         while self.is_active() and (not url or self.get_playing_file() == url):
+            if not self.is_tracking():
+                logging.debug("A newer play took over. Stopped following playback.")
+                return
             self._update_position()
             for event, handle, callback in events:
                 if handle():
@@ -113,8 +120,10 @@ class Player(object):
 
 
 class TorrestPlayer(Player):
-    def __init__(self, text_handler=None, on_start_handler=None, on_close_handler=None, download_status_handler=None):
+    def __init__(self, text_handler=None, on_start_handler=None, on_close_handler=None, download_status_handler=None,
+                 active_handler=None):
         super(TorrestPlayer, self).__init__()
+        self._active_handler = active_handler
         self._stopped = False
         self._text_handler = text_handler
         # Returns the playing torrent's status, published for the skin's OSD (see lib/play_status.py)
@@ -123,6 +132,9 @@ class TorrestPlayer(Player):
         self._on_start_handler = on_start_handler
         self._on_close_handler = on_close_handler
         self._overlay = self._overlay_thread = None
+
+    def is_tracking(self):
+        return self._active_handler is None or self._active_handler()
 
     # noinspection PyAttributeOutsideInit
     def on_playback_started(self):

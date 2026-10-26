@@ -31,6 +31,8 @@ CANCEL_PROPERTY = "torrest.cancel"
 STATE_PROPERTY = "torrest.state"
 # Which play owns the properties, so a play that ends late doesn't clear a newer play's status
 OWNER_PROPERTY = "torrest.owner"
+# The newest play (never cleared), so older plays still running know they were replaced
+LATEST_PROPERTY = "torrest.latest"
 PROPERTIES = ("state", "progress", "label", "speed", "peers", "seeds", "name", "error")
 
 STATE_STARTING = "starting"
@@ -104,6 +106,7 @@ class PlayStatus(object):
         self._home.clearProperty(CANCEL_PROPERTY)
         self._clear_properties()
         self._home.setProperty(OWNER_PROPERTY, self._token)
+        self._home.setProperty(LATEST_PROPERTY, self._token)
         self.state = STATE_STARTING
         self._set(state=STATE_STARTING, progress=0)
 
@@ -118,6 +121,10 @@ class PlayStatus(object):
         if name is not None:
             values["name"] = name
         self._set(**values)
+
+    def superseded(self):
+        """True once a newer play started (e.g. another episode was chosen while this one buffered)."""
+        return self._home.getProperty(LATEST_PROPERTY) != self._token
 
     def cancel_requested(self):
         return self._home.getProperty(CANCEL_PROPERTY) == "1"

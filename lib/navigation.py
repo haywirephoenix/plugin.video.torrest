@@ -80,6 +80,18 @@ class CanceledError(PlayError):
         super(CanceledError, self).__init__(e)
 
 
+class SupersededError(PlayError):
+    """A newer play started: give up without resolving, and leave the torrent to that play."""
+
+    def handle(self):
+        pass
+
+
+def check_superseded():
+    if play_status.superseded():
+        raise SupersededError("A newer play started")
+
+
 def check_playable(func, _ctx=ThreadLocal(True)):
     def wrapper(*args, **kwargs):
         if _ctx.get():
@@ -566,6 +578,7 @@ def wait_for_metadata(info_hash):
             progress.update(percent)
             if progress.iscanceled() or play_status.cancel_requested():
                 raise CanceledError("User canceled metadata", info_hash)
+            check_superseded()
     finally:
         progress.close()
 
@@ -615,6 +628,7 @@ def wait_for_buffering_completion(info_hash, file_id):
 
             if progress.iscanceled() or play_status.cancel_requested():
                 raise CanceledError("User canceled buffering", info_hash)
+            check_superseded()
             if 0 < timeout < current_time - start_time:
                 raise play_failed(30236, "Buffering timeout reached")
             if monitor.waitForAbort(0.5):
@@ -639,6 +653,9 @@ def play(info_hash, file_id):
     file_li.setProperty("IsPlayable", "true")
 
     status = play_status
+    # Resolving now would leave this stream queued behind the newer play's, and Kodi plays it
+    # when that one stops (even while quitting)
+    check_superseded()
     status.update(STATE_BUFFERING, translate(30249), progress=100, name=name)
     setResolvedUrl(plugin.handle, True, file_li)
 
@@ -654,12 +671,16 @@ def play(info_hash, file_id):
                 if settings.show_status_overlay() and not skin_osd else None,
                 download_status_handler=(lambda: api.torrent_status(info_hash)) if skin_osd else None,
                 on_start_handler=lambda: status.playing(translate(30250)),
+                active_handler=lambda: not status.superseded(),
                 on_close_handler=on_close,
         ) as player:
             player.handle_events(url=serve_url)
     except Exception as e:
         logging.error("Caught exception while playing file: %s", e, exc_info=True)
 
+    if status.superseded():
+        # A newer play took over (maybe the same torrent): leave its status and torrent alone
+        return
     if status.state != STATE_PLAYING:
         # Kodi never started the stream (or another file replaced it): don't leave the skin waiting
         status.failed(translate(30251))
