@@ -343,6 +343,22 @@ msgctxt "#30095"
 msgid "Buffer at the end of the file (MB)"
 msgstr ""
 
+msgctxt "#30096"
+msgid "Delete when stopped near the start"
+msgstr ""
+
+msgctxt "#30097"
+msgid "Near the start: watched less than (%)"
+msgstr ""
+
+msgctxt "#30098"
+msgid "Delete when watched to the end"
+msgstr ""
+
+msgctxt "#30099"
+msgid "Watched to the end: at least (%)"
+msgstr ""
+
 msgctxt "#30100"
 msgid "Torrest - first run"
 msgstr ""

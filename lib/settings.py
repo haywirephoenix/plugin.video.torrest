@@ -59,6 +59,22 @@ def get_on_playback_stop_action():
     return get_int_setting("on_playback_stop")
 
 
+def delete_unstarted():
+    return get_boolean_setting("delete_unstarted")
+
+
+def get_unstarted_percent():
+    return get_int_setting("unstarted_percent")
+
+
+def delete_watched():
+    return get_boolean_setting("delete_watched")
+
+
+def get_watched_percent():
+    return get_int_setting("watched_percent")
+
+
 def service_enabled():
     return get_boolean_setting("service_enabled")
 

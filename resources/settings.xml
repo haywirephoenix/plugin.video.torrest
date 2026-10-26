@@ -19,6 +19,12 @@
         <setting id="buffer_timeout" type="slider" label="30003" option="int" range="0,30,600" default="300"/>
         <setting id="min_candidate_size" type="slider" label="30055" option="int" range="0,10,200" default="100"/>
         <setting id="on_playback_stop" type="enum" label="30086" default="0" lvalues="30087|30088|30089"/>
+        <setting id="delete_unstarted" type="bool" label="30096" default="true"/>
+        <setting id="unstarted_percent" type="slider" label="30097" option="int" range="0,1,50" default="5"
+                 enable="eq(-1,true)" subsetting="true"/>
+        <setting id="delete_watched" type="bool" label="30098" default="true"/>
+        <setting id="watched_percent" type="slider" label="30099" option="int" range="50,1,100" default="90"
+                 enable="eq(-1,true)" subsetting="true"/>
         <setting id="show_bg_progress" type="bool" label="30068" default="true"/>
         <setting id="download_after_insert" type="bool" label="30062" default="false"/>
         <setting id="migrated" type="bool" visible="false" default="false"/>

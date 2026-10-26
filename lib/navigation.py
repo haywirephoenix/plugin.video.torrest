@@ -33,6 +33,9 @@ play_status = None
 # The play's magnet (with trackers), when it came from one, and its stuck queue watch
 play_magnet_uri = None
 queue_watch = None
+# The play's torrent, and whether this play added it (rather than playing one already there)
+play_torrent = None
+play_torrent_added = False
 
 # Seconds a play's torrent may sit in libtorrent's queue before its magnet is re-added
 QUEUED_RECOVERY_DELAY = 8
@@ -72,7 +75,9 @@ class PlayError(Exception):
         self.reason = reason
 
     def handle(self):
-        pass
+        # The play ended before playback: clean up as for a stop right at the start
+        if play_torrent is not None:
+            handle_player_stop(play_torrent, added=play_torrent_added)
 
 
 def play_failed(message_id, log_message):
@@ -85,20 +90,18 @@ def play_failed(message_id, log_message):
 class CanceledError(PlayError):
     def __init__(self, e, info_hash):
         super(CanceledError, self).__init__(e)
-        self._info_hash = info_hash
-
-    def handle(self):
-        handle_player_stop(self._info_hash)
 
 
 def check_playable(func, _ctx=ThreadLocal(True)):
     def wrapper(*args, **kwargs):
         if _ctx.get():
             _ctx.set(False)
-            global play_status, play_magnet_uri, queue_watch
+            global play_status, play_magnet_uri, queue_watch, play_torrent, play_torrent_added
             status = play_status = PlayStatus()
             play_magnet_uri = None
             queue_watch = QueueWatch()
+            play_torrent = None
+            play_torrent_added = False
             status.start()
 
             try:
@@ -185,16 +188,31 @@ def get_status_labels(info_hash):
             status.seeders_total, status.peers, status.peers_total))
 
 
-def handle_player_stop(info_hash, name=None, initial_delay=0.5, listing_timeout=10):
-    stop_action = settings.get_on_playback_stop_action()
-    if stop_action == settings.PlaybackStopAction.IGNORE:
-        return
+def handle_player_stop(info_hash, name=None, watched=None, added=False, initial_delay=0.5, listing_timeout=10):
+    """
+    After a play ends. watched: how much was played (0-100), or None when it ended before
+    playback started; then the torrent counts as unstarted only if this play added it.
+    """
     try:
         info = api.torrent_info(info_hash)
     except TorrestError:
         return
     if name is None:
         name = info.name
+
+    unstarted = added if watched is None else watched < settings.get_unstarted_percent()
+    if settings.delete_unstarted() and unstarted:
+        logging.info("Deleting %s: stopped near the start", name)
+        remove_torrent_files(info_hash)
+        return
+    if watched is not None and settings.delete_watched() and watched >= settings.get_watched_percent():
+        logging.info("Deleting %s: watched to the end", name)
+        remove_torrent_files(info_hash)
+        return
+
+    stop_action = settings.get_on_playback_stop_action()
+    if stop_action == settings.PlaybackStopAction.IGNORE:
+        return
 
     sleep(int(initial_delay * 1000))
     start_time = time.time()
@@ -203,12 +221,16 @@ def handle_player_stop(info_hash, name=None, initial_delay=0.5, listing_timeout=
 
     if (stop_action == settings.PlaybackStopAction.DELETE
             or Dialog().yesno(ADDON_NAME, name + "\n" + translate(30241))):
-        api.remove_torrent(info_hash, delete=True)
-        current_folder = getInfoLabel("Container.FolderPath")
-        if current_folder == plugin.url_for(torrent_files, info_hash):
-            executebuiltin("Action(Back)")
-        elif current_folder == plugin.url_for(torrents):
-            refresh()
+        remove_torrent_files(info_hash)
+
+
+def remove_torrent_files(info_hash):
+    api.remove_torrent(info_hash, delete=True)
+    current_folder = getInfoLabel("Container.FolderPath")
+    if current_folder == plugin.url_for(torrent_files, info_hash):
+        executebuiltin("Action(Back)")
+    elif current_folder == plugin.url_for(torrents):
+        refresh()
 
 
 @plugin.route("/")
@@ -383,7 +405,7 @@ def display_text(info_hash, file_id):
 @query_arg("buffer", required=False, arg_type=Types.boolean)
 def play_url(url, file_id=None, index=None, buffer=True):
     r = requests.get(url, stream=True)
-    info_hash = api.add_torrent_obj(r.raw, ignore_duplicate=True, download=False)
+    info_hash = add_for_play(lambda: api.add_torrent_obj(r.raw, ignore_duplicate=True, download=False))
     play_info_hash(info_hash, file_id=index if file_id is None else file_id, buffer=buffer)
 
 
@@ -396,8 +418,17 @@ def play_url(url, file_id=None, index=None, buffer=True):
 def play_magnet(magnet, file_id=None, index=None, buffer=True):
     global play_magnet_uri
     magnet = play_magnet_uri = with_trackers(magnet)
-    info_hash = api.add_magnet(magnet, ignore_duplicate=True, download=False)
+    info_hash = add_for_play(lambda: api.add_magnet(magnet, ignore_duplicate=True, download=False))
     play_info_hash(info_hash, file_id=index if file_id is None else file_id, buffer=buffer)
+
+
+def add_for_play(add):
+    """Adds the play's torrent, noting whether it is new (so an unstarted play can delete it)."""
+    global play_torrent_added
+    existing = set(t.info_hash for t in api.torrents(status=False))
+    info_hash = add()
+    play_torrent_added = info_hash not in existing
+    return info_hash
 
 
 def with_trackers(magnet):
@@ -444,7 +475,7 @@ class QueueWatch(object):
 @query_arg("index", required=False, arg_type=Types.integer)
 @query_arg("buffer", required=False, arg_type=Types.boolean)
 def play_file(path, file_id=None, index=None, buffer=True):
-    info_hash = api.add_torrent(path, ignore_duplicate=True, download=False)
+    info_hash = add_for_play(lambda: api.add_torrent(path, ignore_duplicate=True, download=False))
     play_info_hash(info_hash, file_id=index if file_id is None else file_id, buffer=buffer)
 
 
@@ -453,6 +484,8 @@ def play_file(path, file_id=None, index=None, buffer=True):
 @query_arg("file_id", required=False, arg_type=Types.integer)
 @check_playable
 def play_info_hash(info_hash, file_id=None, buffer=True):
+    global play_torrent
+    play_torrent = info_hash
     if not api.torrent_status(info_hash).has_metadata:
         wait_for_metadata(info_hash)
 
@@ -614,9 +647,9 @@ def play(info_hash, file_id):
     status.update(STATE_BUFFERING, translate(30249), progress=100, name=name)
     setResolvedUrl(plugin.handle, True, file_li)
 
-    def on_close():
+    def on_close(watched):
         status.clear()
-        handle_player_stop(info_hash, name=name)
+        handle_player_stop(info_hash, name=name, watched=watched)
 
     try:
         with TorrestPlayer(
@@ -632,6 +665,7 @@ def play(info_hash, file_id):
     if status.state != STATE_PLAYING:
         # Kodi never started the stream (or another file replaced it): don't leave the skin waiting
         status.failed(translate(30251))
+        handle_player_stop(info_hash, name=name, added=play_torrent_added)
     else:
         status.clear()
 

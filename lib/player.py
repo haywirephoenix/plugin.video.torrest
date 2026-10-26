@@ -28,6 +28,19 @@ class Player(object):
         super(Player, self).__init__()
         self._monitor = xbmc.Monitor()
         self._player = xbmc.Player()
+        self._position = self._duration = 0
+
+    @property
+    def watched(self):
+        """How much of the video was played (0-100), from the last position seen while playing."""
+        return 100.0 * self._position / self._duration if self._duration > 0 else 0
+
+    def _update_position(self):
+        try:
+            self._position = self._player.getTime()
+            self._duration = self._player.getTotalTime()
+        except RuntimeError:
+            pass
 
     def handle_events(self, url=None, timeout=60, period=0.2):
         start_time = time.time()
@@ -55,6 +68,7 @@ class Player(object):
 
         _execute_callback(self.on_playback_started)
         while self.is_active() and (not url or self.get_playing_file() == url):
+            self._update_position()
             for event, handle, callback in events:
                 if handle():
                     if current_event != event:
@@ -128,7 +142,7 @@ class TorrestPlayer(Player):
     def on_playback_stopped(self):
         self._stopped = True
         if self._on_close_handler:
-            self._on_close_handler()
+            self._on_close_handler(self.watched)
 
     def on_abort_requested(self):
         self._stopped = True
