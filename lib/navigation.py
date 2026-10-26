@@ -200,12 +200,19 @@ def handle_player_stop(info_hash, name=None, watched=None, added=False, initial_
     if name is None:
         name = info.name
 
-    unstarted = added if watched is None else watched < settings.get_unstarted_percent()
+    # Only the whole torrent can be deleted: never a pack (a season, say) for one of its videos
+    if is_pack(info_hash):
+        logging.info("Keeping %s: more than one video in it", name)
+        unstarted = watched_to_end = False
+    else:
+        unstarted = added if watched is None else watched < settings.get_unstarted_percent()
+        watched_to_end = watched is not None and watched >= settings.get_watched_percent()
+
     if settings.delete_unstarted() and unstarted:
         logging.info("Deleting %s: stopped near the start", name)
         remove_torrent_files(info_hash)
         return
-    if watched is not None and settings.delete_watched() and watched >= settings.get_watched_percent():
+    if settings.delete_watched() and watched_to_end:
         logging.info("Deleting %s: watched to the end", name)
         remove_torrent_files(info_hash)
         return
@@ -228,6 +235,11 @@ def handle_player_stop(info_hash, name=None, watched=None, added=False, initial_
             api.pause_torrent(info_hash)
         except TorrestError as e:
             logging.debug("Failed to pause %s: %s", info_hash, e)
+
+
+def is_pack(info_hash):
+    min_size = settings.get_min_candidate_size() * 1024 * 1024
+    return sum(1 for f in api.files(info_hash, status=False) if is_video(f.path) and f.length >= min_size) > 1
 
 
 def remove_torrent_files(info_hash):
