@@ -4,9 +4,9 @@ import re
 import time
 
 try:
-    from urllib.parse import quote
+    from urllib.parse import quote, unquote
 except ImportError:
-    from urllib import quote
+    from urllib import quote, unquote
 
 import requests
 import routing
@@ -30,8 +30,8 @@ api = Torrest(settings.get_service_address(), settings.get_port(), settings.ssl_
 # Status of the play in progress, for skins (see lib/play_status.py)
 play_status = None
 
-# Added to magnets that come without any tracker (e.g. Torrentio's, built from just the info
-# hash), so peers and metadata don't have to come from DHT alone
+# Added to magnets (see the "trackers" setting): Torrentio's, for one, carry just the info hash,
+# so without these peers and metadata come from DHT alone
 PUBLIC_TRACKERS = (
     "udp://tracker.opentrackr.org:1337/announce",
     "udp://open.demonii.com:1337/announce",
@@ -385,10 +385,17 @@ def play_url(url, file_id=None, index=None, buffer=True):
 @query_arg("index", required=False, arg_type=Types.integer)
 @query_arg("buffer", required=False, arg_type=Types.boolean)
 def play_magnet(magnet, file_id=None, index=None, buffer=True):
-    if settings.add_public_trackers() and "tr=" not in magnet:
-        magnet += "".join("&tr=" + quote(t, safe="") for t in PUBLIC_TRACKERS)
+    magnet = with_trackers(magnet)
     info_hash = api.add_magnet(magnet, ignore_duplicate=True, download=False)
     play_info_hash(info_hash, file_id=index if file_id is None else file_id, buffer=buffer)
+
+
+def with_trackers(magnet):
+    mode = settings.get_trackers_mode()
+    if mode == settings.TrackersMode.DISABLED or (mode == settings.TrackersMode.NO_TRACKERS and "tr=" in magnet):
+        return magnet
+    existing = unquote(magnet)
+    return magnet + "".join("&tr=" + quote(t, safe="") for t in PUBLIC_TRACKERS if t not in existing)
 
 
 @plugin.route("/play_path")

@@ -7,6 +7,12 @@ class FilesOrder:
     SIZE = 2
 
 
+class TrackersMode:
+    ALL = 0
+    NO_TRACKERS = 1
+    DISABLED = 2
+
+
 class PlaybackStopAction:
     ASK_TO_DELETE = 0
     DELETE = 1
@@ -25,8 +31,8 @@ def get_metadata_timeout():
     return get_int_setting("metadata_timeout")
 
 
-def add_public_trackers():
-    return get_boolean_setting("add_trackers")
+def get_trackers_mode():
+    return get_int_setting("trackers")
 
 
 def get_buffering_timeout():

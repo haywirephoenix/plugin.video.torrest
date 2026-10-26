@@ -320,7 +320,19 @@ msgstr ""
 
 # Service
 msgctxt "#30090"
-msgid "Add public trackers to magnets without any"
+msgid "Add public trackers"
+msgstr ""
+
+msgctxt "#30091"
+msgid "All torrents"
+msgstr ""
+
+msgctxt "#30092"
+msgid "Only torrents with no trackers"
+msgstr ""
+
+msgctxt "#30093"
+msgid "Disabled"
 msgstr ""
 
 msgctxt "#30100"
