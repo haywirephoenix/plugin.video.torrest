@@ -10,6 +10,7 @@ import xbmcgui
 
 from lib import kodi
 from lib import settings
+from lib import trackers
 from lib.constants import PLATFORM, LIB_NAME, EXE_NAME
 from lib.play_status import skin_ui_enabled, STATE_PROPERTY
 from lib.torrest.api import Torrest, STATUS_FINISHED, STATUS_SEEDING, STATUS_PAUSED
@@ -330,6 +331,37 @@ class CompletedTorrentsStopper(xbmc.Monitor, threading.Thread):
         return False
 
 
+class TrackersChecker(xbmc.Monitor, threading.Thread):
+    """Checks the public trackers a minute after start and then every 6 hours (see lib/trackers.py)."""
+    first_delay = 60
+    interval = 6 * 60 * 60
+
+    def __init__(self):
+        xbmc.Monitor.__init__(self)
+        threading.Thread.__init__(self)
+        self.daemon = True
+
+    def run(self):
+        delay = self.first_delay
+        while not self.waitForAbort(delay):
+            delay = self.interval
+            max_failures = settings.get_tracker_max_failures()
+            if max_failures > 0 and settings.get_trackers_mode() != settings.TrackersMode.DISABLED:
+                try:
+                    answered, checked = trackers.check(max_failures)
+                    logging.info("Trackers check: %d of %d answered", answered, checked)
+                except Exception as e:
+                    logging.error("Trackers check failed: %s", e, exc_info=True)
+
+    def __enter__(self):
+        self.start()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.join()
+        return False
+
+
 @kodi.once("migrated")
 def handle_first_run():
     logging.info("Handling first run")
@@ -344,7 +376,7 @@ def run():
 
     try:
         with DaemonMonitor() as monitor:
-            with DownloadProgress(), CompletedTorrentsStopper():
+            with DownloadProgress(), CompletedTorrentsStopper(), TrackersChecker():
                 monitor.handle_crashes()
     except TorrestDaemonNotFoundError as e:
         logging.info("Daemon not found. Aborting service (%s).", e)

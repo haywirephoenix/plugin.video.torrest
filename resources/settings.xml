@@ -40,6 +40,8 @@
         <setting label="30114" type="action" action="RunPlugin(plugin://plugin.video.torrest/trackers/add_url)"/>
         <setting label="30115" type="action" action="RunPlugin(plugin://plugin.video.torrest/trackers/remove)"/>
         <setting label="30116" type="action" action="RunPlugin(plugin://plugin.video.torrest/trackers/reset)"/>
+        <setting id="tracker_max_failures" type="slider" label="30121" option="int" range="0,1,10" default="3"/>
+        <setting label="30123" type="action" action="RunPlugin(plugin://plugin.video.torrest/trackers/check)"/>
     </category>
     <!-- General -->
     <category label="30000">

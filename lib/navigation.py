@@ -17,7 +17,7 @@ from xbmcplugin import addDirectoryItem, endOfDirectory, setResolvedUrl
 from lib import settings, trackers
 from lib.dialog import DialogInsert
 from lib.kodi import ADDON_PATH, ADDON_NAME, translate, notification, set_logger, refresh, show_picture, \
-    close_busy_dialog
+    busy_dialog, close_busy_dialog
 from lib.kodi_formats import is_music, is_picture, is_video, is_text
 from lib.play_status import PlayStatus, STATE_STARTING, STATE_BUFFERING, STATE_PLAYING
 from lib.player import TorrestPlayer
@@ -713,6 +713,13 @@ def trackers_action(action_str):
                 notification(translate(30117).format(trackers.add(urls)), time=2000)
             else:
                 notification(translate(30118))
+    elif action_str == "check":
+        busy_dialog()
+        try:
+            answered, checked = trackers.check(settings.get_tracker_max_failures())
+        finally:
+            close_busy_dialog()
+        notification(translate(30122).format(answered, checked))
     elif action_str == "reset":
         if Dialog().yesno(ADDON_NAME, translate(30116) + "?"):
             trackers.reset()

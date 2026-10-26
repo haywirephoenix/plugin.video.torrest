@@ -39,6 +39,10 @@ def get_trackers_mode():
     return get_int_setting("trackers")
 
 
+def get_tracker_max_failures():
+    return get_int_setting("tracker_max_failures")
+
+
 def get_buffer_start_size():
     return get_int_setting("buffer_start") * 1024 * 1024
 

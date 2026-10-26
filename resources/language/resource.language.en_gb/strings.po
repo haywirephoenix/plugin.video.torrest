@@ -444,6 +444,18 @@ msgctxt "#30120"
 msgid "Removed {} trackers"
 msgstr ""
 
+msgctxt "#30121"
+msgid "Turn a tracker off after failed checks in a row (0 = never)"
+msgstr ""
+
+msgctxt "#30122"
+msgid "{} of {} trackers answered"
+msgstr ""
+
+msgctxt "#30123"
+msgid "Check trackers now"
+msgstr ""
+
 msgctxt "#30200"
 msgid "Insert file or URL"
 msgstr ""
