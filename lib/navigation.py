@@ -677,6 +677,49 @@ def file_action(info_hash, file_id, action_str):
     refresh()
 
 
+# A list kept up to date with working public trackers
+TRACKERS_LIST_URL = "https://ngosang.github.io/trackerslist/trackers_best.txt"
+
+
+def tracker_label(t):
+    if t["failures"]:
+        return "{} ({})".format(t["url"], translate(30119).format(t["failures"]))
+    return t["url"]
+
+
+@plugin.route("/trackers/<action_str>")
+def trackers_action(action_str):
+    """The Trackers settings page's buttons."""
+    all_trackers = trackers.load()
+    if action_str == "enable":
+        selected = Dialog().multiselect(translate(30112), [tracker_label(t) for t in all_trackers],
+                                        preselect=[i for i, t in enumerate(all_trackers) if t["enabled"]])
+        if selected is not None:
+            trackers.set_enabled(set(all_trackers[i]["url"] for i in selected))
+    elif action_str == "remove":
+        selected = Dialog().multiselect(translate(30115), [tracker_label(t) for t in all_trackers])
+        if selected:
+            trackers.remove(set(all_trackers[i]["url"] for i in selected))
+            notification(translate(30120).format(len(selected)), time=2000)
+    elif action_str in ("add", "add_url"):
+        if action_str == "add":
+            text = Dialog().input(translate(30113))
+        else:
+            url = Dialog().input(translate(30114), TRACKERS_LIST_URL)
+            text = url and requests.get(url, timeout=15).text
+        if text:
+            urls = trackers.parse(text)
+            if urls:
+                notification(translate(30117).format(trackers.add(urls)), time=2000)
+            else:
+                notification(translate(30118))
+    elif action_str == "reset":
+        if Dialog().yesno(ADDON_NAME, translate(30116) + "?"):
+            trackers.reset()
+    else:
+        logging.error("Unknown action '%s'", action_str)
+
+
 @plugin.route("/insert")
 def dialog_insert():
     window = DialogInsert("DialogInsert.xml", ADDON_PATH, "Default")

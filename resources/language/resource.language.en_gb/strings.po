@@ -408,6 +408,42 @@ msgctxt "#30111"
 msgid "Trackers"
 msgstr ""
 
+msgctxt "#30112"
+msgid "Choose which trackers to use"
+msgstr ""
+
+msgctxt "#30113"
+msgid "Add trackers (paste a list)"
+msgstr ""
+
+msgctxt "#30114"
+msgid "Add trackers from a list online"
+msgstr ""
+
+msgctxt "#30115"
+msgid "Remove trackers"
+msgstr ""
+
+msgctxt "#30116"
+msgid "Reset to the default trackers"
+msgstr ""
+
+msgctxt "#30117"
+msgid "Added {} trackers"
+msgstr ""
+
+msgctxt "#30118"
+msgid "No tracker URLs found"
+msgstr ""
+
+msgctxt "#30119"
+msgid "{} failed checks"
+msgstr ""
+
+msgctxt "#30120"
+msgid "Removed {} trackers"
+msgstr ""
+
 msgctxt "#30200"
 msgid "Insert file or URL"
 msgstr ""

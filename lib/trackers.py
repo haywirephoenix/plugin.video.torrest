@@ -72,5 +72,20 @@ def add(urls):
     return added
 
 
+def set_enabled(urls):
+    """Enables exactly these URLs; a tracker enabled again starts over on failed checks."""
+    trackers = load()
+    for t in trackers:
+        enabled = t["url"] in urls
+        if enabled and not t["enabled"]:
+            t["failures"] = 0
+        t["enabled"] = enabled
+    save(trackers)
+
+
+def remove(urls):
+    save([t for t in load() if t["url"] not in urls])
+
+
 def reset():
     save([tracker(url) for url in DEFAULT_TRACKERS])
