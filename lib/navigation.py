@@ -22,7 +22,7 @@ from lib.kodi_formats import is_music, is_picture, is_video, is_text
 from lib.play_status import PlayStatus, STATE_STARTING, STATE_BUFFERING, STATE_PLAYING
 from lib.player import TorrestPlayer
 from lib.prebuffer import PreBuffer
-from lib.torrest.api import Torrest, TorrestError, STATUS_SEEDING, STATUS_PAUSED
+from lib.torrest.api import Torrest, TorrestError, STATUS_SEEDING, STATUS_PAUSED, STATUS_QUEUED
 from lib.utils import sizeof_fmt, ThreadLocal
 
 set_logger()
@@ -30,6 +30,12 @@ plugin = routing.Plugin()
 api = Torrest(settings.get_service_address(), settings.get_port(), settings.ssl_enabled())
 # Status of the play in progress, for skins (see lib/play_status.py)
 play_status = None
+# The play's magnet (with trackers), when it came from one, and its stuck queue watch
+play_magnet_uri = None
+queue_watch = None
+
+# Seconds a play's torrent may sit in libtorrent's queue before its magnet is re-added
+QUEUED_RECOVERY_DELAY = 8
 
 # Added to magnets (see the "trackers" setting): Torrentio's, for one, carry just the info hash,
 # so without these peers and metadata come from DHT alone
@@ -89,8 +95,10 @@ def check_playable(func, _ctx=ThreadLocal(True)):
     def wrapper(*args, **kwargs):
         if _ctx.get():
             _ctx.set(False)
-            global play_status
+            global play_status, play_magnet_uri, queue_watch
             status = play_status = PlayStatus()
+            play_magnet_uri = None
+            queue_watch = QueueWatch()
             status.start()
 
             try:
@@ -386,7 +394,8 @@ def play_url(url, file_id=None, index=None, buffer=True):
 @query_arg("index", required=False, arg_type=Types.integer)
 @query_arg("buffer", required=False, arg_type=Types.boolean)
 def play_magnet(magnet, file_id=None, index=None, buffer=True):
-    magnet = with_trackers(magnet)
+    global play_magnet_uri
+    magnet = play_magnet_uri = with_trackers(magnet)
     info_hash = api.add_magnet(magnet, ignore_duplicate=True, download=False)
     play_info_hash(info_hash, file_id=index if file_id is None else file_id, buffer=buffer)
 
@@ -397,6 +406,35 @@ def with_trackers(magnet):
         return magnet
     existing = unquote(magnet)
     return magnet + "".join("&tr=" + quote(t, safe="") for t in PUBLIC_TRACKERS if t not in existing)
+
+
+class QueueWatch(object):
+    """
+    Re-adds the play's magnet when its torrent sits in libtorrent's queue. A torrent that was
+    downloading when the daemon stopped (e.g. Kodi restarted mid-buffer) can come back queued
+    and stay there, and pausing/resuming doesn't start it; removing it (keeping its data) and
+    adding the magnet again does.
+    """
+
+    def __init__(self):
+        self._since = None
+        self._retried = False
+
+    def check(self, info_hash, status):
+        """Returns True when the torrent was re-added (its metadata and file priorities are gone)."""
+        if status.state != STATUS_QUEUED or play_magnet_uri is None or self._retried:
+            self._since = None
+            return False
+        now = time.time()
+        if self._since is None:
+            self._since = now
+        if now - self._since < QUEUED_RECOVERY_DELAY:
+            return False
+        logging.warning("Torrent %s stuck in queue, adding its magnet again", info_hash)
+        self._retried = True
+        api.remove_torrent(info_hash, delete=False)
+        api.add_magnet(play_magnet_uri, ignore_duplicate=True, download=False)
+        return True
 
 
 @plugin.route("/play_path")
@@ -485,6 +523,7 @@ def wait_for_metadata(info_hash):
             status = api.torrent_status(info_hash)
             if status.has_metadata:
                 break
+            queue_watch.check(info_hash, status)
             play_status.update(STATE_STARTING, translate(30247 if status.peers else 30246),
                                torrent_status=status)
             if monitor.waitForAbort(0.5):
@@ -531,6 +570,11 @@ def wait_for_buffering_completion(info_hash, file_id):
         while not pre_buffer.completed:
             current_time = time.time()
             status = api.torrent_status(info_hash)
+            if queue_watch.check(info_hash, status):
+                wait_for_metadata(info_hash)
+                api.download_file(info_hash, file_id, buffer=False)
+                continue
+
             done, total = pre_buffer.done, pre_buffer.total
             percent = 100.0 * done / total
             play_status.update(STATE_BUFFERING, "{} {:d}%".format(translate(30248), int(percent)),
