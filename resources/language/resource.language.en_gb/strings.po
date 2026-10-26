@@ -392,6 +392,10 @@ msgctxt "#30107"
 msgid "Stop kept torrents when playback stops"
 msgstr ""
 
+msgctxt "#30108"
+msgid "Stop torrents when they finish downloading (no seeding)"
+msgstr ""
+
 msgctxt "#30200"
 msgid "Insert file or URL"
 msgstr ""

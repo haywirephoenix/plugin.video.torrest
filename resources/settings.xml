@@ -26,6 +26,7 @@
         <setting id="watched_percent" type="slider" label="30099" option="int" range="50,1,100" default="90"
                  enable="eq(-1,true)" subsetting="true"/>
         <setting id="stop_on_exit" type="bool" label="30107" default="true"/>
+        <setting id="stop_when_complete" type="bool" label="30108" default="true"/>
         <setting id="show_bg_progress" type="bool" label="30068" default="true"/>
         <setting id="download_after_insert" type="bool" label="30062" default="false"/>
         <setting id="migrated" type="bool" visible="false" default="false"/>

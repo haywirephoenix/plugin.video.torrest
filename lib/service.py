@@ -11,7 +11,7 @@ import xbmcgui
 from lib import kodi
 from lib import settings
 from lib.constants import PLATFORM, LIB_NAME, EXE_NAME
-from lib.play_status import skin_ui_enabled
+from lib.play_status import skin_ui_enabled, STATE_PROPERTY
 from lib.torrest.api import Torrest, STATUS_FINISHED, STATUS_SEEDING, STATUS_PAUSED
 from lib.torrest_daemon import TorrestLibraryDaemon, TorrestExecutableDaemon, TorrestDaemonNotFoundError
 from lib.utils import sizeof_fmt, assure_unicode
@@ -274,6 +274,48 @@ class DownloadProgress(xbmc.Monitor, threading.Thread):
         return False
 
 
+class CompletedTorrentsStopper(xbmc.Monitor, threading.Thread):
+    """Pauses torrents once they finish downloading, so none of them seeds in the background."""
+
+    def __init__(self):
+        xbmc.Monitor.__init__(self)
+        threading.Thread.__init__(self)
+        self.daemon = True
+        self._api = self._enabled = None
+        self._player = xbmc.Player()
+        self._home = xbmcgui.Window(kodi.WINDOW_HOME)
+        self.onSettingsChanged()
+
+    def run(self):
+        while not self.waitForAbort(5):
+            # Not while a play starts: its torrent looks finished until its file is set to download
+            if self._enabled and not self._home.getProperty(STATE_PROPERTY):
+                try:
+                    self._stop_completed()
+                except requests.exceptions.ConnectionError:
+                    logging.debug("Failed to check for completed torrents")
+
+    def _stop_completed(self):
+        playing = self._player.getPlayingFile() if self._player.isPlaying() else ""
+        for torrent in self._api.torrents():
+            if (torrent.status.state in (STATUS_FINISHED, STATUS_SEEDING) and not torrent.status.paused
+                    and "/torrents/{}/".format(torrent.info_hash) not in playing):
+                logging.info("Stopping completed torrent %s", torrent.name)
+                self._api.pause_torrent(torrent.info_hash)
+
+    def onSettingsChanged(self):
+        self._api = Torrest(settings.get_service_address(), settings.get_port(), settings.ssl_enabled())
+        self._enabled = settings.stop_when_complete()
+
+    def __enter__(self):
+        self.start()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.join()
+        return False
+
+
 @kodi.once("migrated")
 def handle_first_run():
     logging.info("Handling first run")
@@ -288,7 +330,7 @@ def run():
 
     try:
         with DaemonMonitor() as monitor:
-            with DownloadProgress():
+            with DownloadProgress(), CompletedTorrentsStopper():
                 monitor.handle_crashes()
     except TorrestDaemonNotFoundError as e:
         logging.info("Daemon not found. Aborting service (%s).", e)

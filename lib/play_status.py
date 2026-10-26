@@ -18,6 +18,7 @@ from lib.kodi import WINDOW_HOME
 
 SKIN_UI_PROPERTY = "ultra.torrent.ui"
 CANCEL_PROPERTY = "torrest.cancel"
+STATE_PROPERTY = "torrest.state"
 # Which play owns the properties, so a play that ends late doesn't clear a newer play's status
 OWNER_PROPERTY = "torrest.owner"
 PROPERTIES = ("state", "progress", "label", "speed", "peers", "seeds", "name", "error")
