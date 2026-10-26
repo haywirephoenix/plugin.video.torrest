@@ -400,6 +400,10 @@ msgctxt "#30109"
 msgid "Stop torrents left active when Kodi starts"
 msgstr ""
 
+msgctxt "#30110"
+msgid "Notify when the daemon starts"
+msgstr ""
+
 msgctxt "#30200"
 msgid "Insert file or URL"
 msgstr ""

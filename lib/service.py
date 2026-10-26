@@ -67,7 +67,7 @@ class DaemonMonitor(xbmc.Monitor):
         while not 0 < timeout < time.time() - start:
             try:
                 self._request("get", "")
-                if notification:
+                if notification and settings.show_daemon_notification():
                     kodi.notification(kodi.translate(30104))
                 return
             except requests.exceptions.ConnectionError:
