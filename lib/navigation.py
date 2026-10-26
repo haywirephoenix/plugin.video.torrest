@@ -14,7 +14,7 @@ from xbmc import Monitor, executebuiltin, getInfoLabel, getCondVisibility, sleep
 from xbmcgui import ListItem, DialogProgress, Dialog
 from xbmcplugin import addDirectoryItem, endOfDirectory, setResolvedUrl
 
-from lib import settings
+from lib import settings, trackers
 from lib.dialog import DialogInsert
 from lib.kodi import ADDON_PATH, ADDON_NAME, translate, notification, set_logger, refresh, show_picture, \
     close_busy_dialog
@@ -40,18 +40,6 @@ play_torrent_added = False
 # Seconds a play's torrent may sit in libtorrent's queue before its magnet is re-added
 QUEUED_RECOVERY_DELAY = 8
 
-# Added to magnets (see the "trackers" setting): Torrentio's, for one, carry just the info hash,
-# so without these peers and metadata come from DHT alone
-PUBLIC_TRACKERS = (
-    "udp://tracker.opentrackr.org:1337/announce",
-    "udp://open.demonii.com:1337/announce",
-    "udp://open.stealth.si:80/announce",
-    "udp://tracker.torrent.eu.org:451/announce",
-    "udp://exodus.desync.com:6969/announce",
-    "udp://explodie.org:6969/announce",
-    "udp://tracker.openbittorrent.com:6969/announce",
-    "udp://tracker.tiny-vps.com:6969/announce",
-)
 
 
 class Types:
@@ -439,7 +427,7 @@ def with_trackers(magnet):
     if mode == settings.TrackersMode.DISABLED or (mode == settings.TrackersMode.NO_TRACKERS and "tr=" in magnet):
         return magnet
     existing = unquote(magnet)
-    return magnet + "".join("&tr=" + quote(t, safe="") for t in PUBLIC_TRACKERS if t not in existing)
+    return magnet + "".join("&tr=" + quote(t, safe="") for t in trackers.enabled_urls() if t not in existing)
 
 
 class QueueWatch(object):

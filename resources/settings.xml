@@ -14,7 +14,6 @@
         <setting id="files_order" type="enum" label="30064" default="0" lvalues="30065|30066|30067"/>
         <setting id="overlay" type="bool" label="30004" default="true"/>
         <setting id="metadata_timeout" type="slider" label="30081" option="int" range="0,10,120" default="30"/>
-        <setting id="trackers" type="enum" label="30090" default="0" lvalues="30091|30092|30093"/>
         <setting id="buffer_start" type="slider" label="30094" option="int" range="5,5,200" default="15"/>
         <setting id="buffer_end" type="slider" label="30095" option="int" range="0,1,20" default="5"/>
         <setting id="buffer_timeout" type="slider" label="30003" option="int" range="0,30,600" default="300"/>
@@ -32,6 +31,10 @@
         <setting id="show_bg_progress" type="bool" label="30068" default="true"/>
         <setting id="download_after_insert" type="bool" label="30062" default="false"/>
         <setting id="migrated" type="bool" visible="false" default="false"/>
+    </category>
+    <!-- Trackers -->
+    <category label="30111">
+        <setting id="trackers" type="enum" label="30090" default="0" lvalues="30091|30092|30093"/>
     </category>
     <!-- General -->
     <category label="30000">
