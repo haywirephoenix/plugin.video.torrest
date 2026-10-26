@@ -42,7 +42,9 @@ def notification(message, heading=ADDON_NAME, icon=ADDON_ICON, time=5000, sound=
 def get_all_settings_spec():
     data = ElementTree.parse(os.path.join(ADDON_PATH, "resources", "settings.xml"))
     for element in data.findall("*/setting"):
-        yield dict(element.attrib)
+        # Action buttons have no id (and no value)
+        if "id" in element.attrib:
+            yield dict(element.attrib)
 
 
 def get_setting_by_spec(spec):
