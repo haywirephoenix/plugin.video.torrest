@@ -98,15 +98,18 @@ class Player(object):
 
 
 class TorrestPlayer(Player):
-    def __init__(self, text_handler=None, on_close_handler=None):
+    def __init__(self, text_handler=None, on_start_handler=None, on_close_handler=None):
         super(TorrestPlayer, self).__init__()
         self._stopped = False
         self._text_handler = text_handler
+        self._on_start_handler = on_start_handler
         self._on_close_handler = on_close_handler
         self._overlay = self._overlay_thread = None
 
     # noinspection PyAttributeOutsideInit
     def on_playback_started(self):
+        if self._on_start_handler:
+            self._on_start_handler()
         if self._text_handler:
             self._overlay = OverlayText()
             self._overlay_thread = threading.Thread(target=self._overlay_updater)

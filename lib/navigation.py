@@ -3,6 +3,11 @@ import os
 import re
 import time
 
+try:
+    from urllib.parse import quote
+except ImportError:
+    from urllib import quote
+
 import requests
 import routing
 from xbmc import Monitor, executebuiltin, getInfoLabel, getCondVisibility, sleep
@@ -14,6 +19,7 @@ from lib.dialog import DialogInsert
 from lib.kodi import ADDON_PATH, ADDON_NAME, translate, notification, set_logger, refresh, show_picture, \
     close_busy_dialog
 from lib.kodi_formats import is_music, is_picture, is_video, is_text
+from lib.play_status import PlayStatus, STATE_STARTING, STATE_BUFFERING, STATE_PLAYING
 from lib.player import TorrestPlayer
 from lib.torrest.api import Torrest, TorrestError, STATUS_SEEDING, STATUS_PAUSED
 from lib.utils import sizeof_fmt, ThreadLocal
@@ -21,6 +27,21 @@ from lib.utils import sizeof_fmt, ThreadLocal
 set_logger()
 plugin = routing.Plugin()
 api = Torrest(settings.get_service_address(), settings.get_port(), settings.ssl_enabled())
+# Status of the play in progress, for skins (see lib/play_status.py)
+play_status = None
+
+# Added to magnets that come without any tracker (e.g. Torrentio's, built from just the info
+# hash), so peers and metadata don't have to come from DHT alone
+PUBLIC_TRACKERS = (
+    "udp://tracker.opentrackr.org:1337/announce",
+    "udp://open.demonii.com:1337/announce",
+    "udp://open.stealth.si:80/announce",
+    "udp://tracker.torrent.eu.org:451/announce",
+    "udp://exodus.desync.com:6969/announce",
+    "udp://explodie.org:6969/announce",
+    "udp://tracker.openbittorrent.com:6969/announce",
+    "udp://tracker.tiny-vps.com:6969/announce",
+)
 
 
 class Types:
@@ -38,8 +59,20 @@ class Types:
 
 
 class PlayError(Exception):
+    def __init__(self, e, reason=None):
+        super(PlayError, self).__init__(e)
+        # What to tell the user, or None when there's nothing to tell (canceled, aborted)
+        self.reason = reason
+
     def handle(self):
         pass
+
+
+def play_failed(message_id, log_message):
+    reason = translate(message_id)
+    if not play_status.skin_ui:
+        notification(reason)
+    return PlayError(log_message, reason=reason)
 
 
 class CanceledError(PlayError):
@@ -55,19 +88,25 @@ def check_playable(func, _ctx=ThreadLocal(True)):
     def wrapper(*args, **kwargs):
         if _ctx.get():
             _ctx.set(False)
+            global play_status
+            status = play_status = PlayStatus()
+            status.start()
 
             try:
                 return func(*args, **kwargs)
             except PlayError as e:
                 setResolvedUrl(plugin.handle, False, ListItem())
                 logging.debug(e)
+                status.failed(e.reason)
                 e.handle()
                 return None
             except Exception as e:
                 setResolvedUrl(plugin.handle, False, ListItem())
+                status.failed(str(e))
                 raise e
             finally:
                 _ctx.set(True)
+                status.linger()
         else:
             return func(*args, **kwargs)
 
@@ -331,31 +370,36 @@ def display_text(info_hash, file_id):
 @check_playable
 @query_arg("url", arg_type=Types.string)
 @query_arg("file_id", required=False, arg_type=Types.integer)
+@query_arg("index", required=False, arg_type=Types.integer)
 @query_arg("buffer", required=False, arg_type=Types.boolean)
-def play_url(url, file_id=None, buffer=True):
+def play_url(url, file_id=None, index=None, buffer=True):
     r = requests.get(url, stream=True)
     info_hash = api.add_torrent_obj(r.raw, ignore_duplicate=True, download=False)
-    play_info_hash(info_hash, file_id=file_id, buffer=buffer)
+    play_info_hash(info_hash, file_id=index if file_id is None else file_id, buffer=buffer)
 
 
 @plugin.route("/play_magnet")
 @check_playable
 @query_arg("magnet", arg_type=Types.string)
 @query_arg("file_id", required=False, arg_type=Types.integer)
+@query_arg("index", required=False, arg_type=Types.integer)
 @query_arg("buffer", required=False, arg_type=Types.boolean)
-def play_magnet(magnet, file_id=None, buffer=True):
+def play_magnet(magnet, file_id=None, index=None, buffer=True):
+    if settings.add_public_trackers() and "tr=" not in magnet:
+        magnet += "".join("&tr=" + quote(t, safe="") for t in PUBLIC_TRACKERS)
     info_hash = api.add_magnet(magnet, ignore_duplicate=True, download=False)
-    play_info_hash(info_hash, file_id=file_id, buffer=buffer)
+    play_info_hash(info_hash, file_id=index if file_id is None else file_id, buffer=buffer)
 
 
 @plugin.route("/play_path")
 @check_playable
 @query_arg("path", arg_type=Types.string)
 @query_arg("file_id", required=False, arg_type=Types.integer)
+@query_arg("index", required=False, arg_type=Types.integer)
 @query_arg("buffer", required=False, arg_type=Types.boolean)
-def play_file(path, file_id=None, buffer=True):
+def play_file(path, file_id=None, index=None, buffer=True):
     info_hash = api.add_torrent(path, ignore_duplicate=True, download=False)
-    play_info_hash(info_hash, file_id=file_id, buffer=buffer)
+    play_info_hash(info_hash, file_id=index if file_id is None else file_id, buffer=buffer)
 
 
 @plugin.route("/play_info_hash/<info_hash>")
@@ -366,13 +410,16 @@ def play_info_hash(info_hash, file_id=None, buffer=True):
     if not api.torrent_status(info_hash).has_metadata:
         wait_for_metadata(info_hash)
 
+    if file_id is not None and file_id not in [f.id for f in api.files(info_hash, status=False)]:
+        logging.warning("File %s not found in %s, choosing a file instead", file_id, info_hash)
+        file_id = None
+
     if file_id is None:
         files = api.files(info_hash, status=False)
         min_candidate_size = settings.get_min_candidate_size() * 1024 * 1024
         candidate_files = [f for f in files if is_video(f.path) and f.length >= min_candidate_size]
         if not candidate_files:
-            notification(translate(30239))
-            raise PlayError("No candidate files found for {}".format(info_hash))
+            raise play_failed(30239, "No candidate files found for {}".format(info_hash))
         elif len(candidate_files) == 1:
             file_id = candidate_files[0].id
         else:
@@ -388,29 +435,61 @@ def play_info_hash(info_hash, file_id=None, buffer=True):
         play(info_hash, file_id)
 
 
+class PlayProgress(object):
+    """Torrest's own progress dialog, left out while the skin draws the play status itself."""
+
+    def __init__(self, *create_args):
+        self._create_args = create_args
+        self._dialog = None
+
+    def update(self, percent, message=None):
+        if play_status.skin_ui:
+            self.close()
+            return
+        if self._dialog is None:
+            self._dialog = DialogProgress()
+            self._dialog.create(ADDON_NAME, *self._create_args)
+        if message is None:
+            self._dialog.update(percent)
+        else:
+            self._dialog.update(percent, message)
+
+    def iscanceled(self):
+        return self._dialog is not None and self._dialog.iscanceled()
+
+    def close(self):
+        if self._dialog is not None:
+            self._dialog.close()
+            self._dialog = None
+
+
 def wait_for_metadata(info_hash):
     close_busy_dialog()
     percent = 0
     timeout = settings.get_metadata_timeout()
     start_time = time.time()
     monitor = Monitor()
-    progress = DialogProgress()
-    progress.create(ADDON_NAME, translate(30237))
+    progress = PlayProgress(translate(30237))
+    progress.update(percent)
 
     try:
-        while not api.torrent_status(info_hash).has_metadata:
+        while True:
+            status = api.torrent_status(info_hash)
+            if status.has_metadata:
+                break
+            play_status.update(STATE_STARTING, translate(30247 if status.peers else 30246),
+                               torrent_status=status)
             if monitor.waitForAbort(0.5):
                 raise PlayError("Abort requested")
             passed_time = time.time() - start_time
             if 0 < timeout:
                 if timeout < passed_time:
-                    notification(translate(30238))
-                    raise PlayError("No metadata after timeout")
+                    raise play_failed(30238, "No metadata after timeout")
                 percent = int(100 * passed_time / timeout)
             else:
                 percent = 0 if percent == 100 else (percent + 5)
             progress.update(percent)
-            if progress.iscanceled():
+            if progress.iscanceled() or play_status.cancel_requested():
                 raise CanceledError("User canceled metadata", info_hash)
     finally:
         progress.close()
@@ -434,8 +513,7 @@ def wait_for_buffering_completion(info_hash, file_id):
     start_time = time.time()
 
     monitor = Monitor()
-    progress = DialogProgress()
-    progress.create(ADDON_NAME)
+    progress = PlayProgress()
 
     try:
         while True:
@@ -444,6 +522,9 @@ def wait_for_buffering_completion(info_hash, file_id):
             if status.buffering_progress >= 100:
                 break
 
+            play_status.update(STATE_BUFFERING, "{} {:d}%".format(translate(30248), int(status.buffering_progress)),
+                               progress=status.buffering_progress, torrent_status=api.torrent_status(info_hash),
+                               name=info.name)
             total_done = status.buffering_total * status.buffering_progress / 100
             speed = float(total_done - last_done) / (current_time - last_time)
             last_time = current_time
@@ -454,12 +535,11 @@ def wait_for_buffering_completion(info_hash, file_id):
                     get_state_string(status.state), status.buffering_progress, sizeof_fmt(total_done),
                     of, sizeof_fmt(status.buffering_total), sizeof_fmt(speed), info.name))
 
-            if progress.iscanceled():
+            if progress.iscanceled() or play_status.cancel_requested():
                 raise CanceledError("User canceled buffering", info_hash)
             if 0 < timeout < current_time - start_time:
-                notification(translate(30236))
-                raise PlayError("Buffering timeout reached")
-            if monitor.waitForAbort(1):
+                raise play_failed(30236, "Buffering timeout reached")
+            if monitor.waitForAbort(0.5):
                 raise PlayError("Abort requested")
     finally:
         progress.close()
@@ -479,17 +559,30 @@ def play(info_hash, file_id):
         file_li.setInfo("music", info_labels)
     file_li.setProperty("IsPlayable", "true")
 
+    status = play_status
+    status.update(STATE_BUFFERING, translate(30249), progress=100, name=name)
     setResolvedUrl(plugin.handle, True, file_li)
+
+    def on_close():
+        status.clear()
+        handle_player_stop(info_hash, name=name)
 
     try:
         with TorrestPlayer(
                 text_handler=(lambda: get_status_labels(info_hash) + (name,))
                 if settings.show_status_overlay() else None,
-                on_close_handler=lambda: handle_player_stop(info_hash, name=name),
+                on_start_handler=lambda: status.playing(translate(30250)),
+                on_close_handler=on_close,
         ) as player:
             player.handle_events(url=serve_url)
     except Exception as e:
         logging.error("Caught exception while playing file: %s", e, exc_info=True)
+
+    if status.state != STATE_PLAYING:
+        # Kodi never started the stream (or another file replaced it): don't leave the skin waiting
+        status.failed(translate(30251))
+    else:
+        status.clear()
 
 
 @plugin.route("/torrents/<info_hash>/files/<file_id>/<action_str>")

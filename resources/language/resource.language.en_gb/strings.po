@@ -319,6 +319,10 @@ msgid "Do nothing"
 msgstr ""
 
 # Service
+msgctxt "#30090"
+msgid "Add public trackers to magnets without any"
+msgstr ""
+
 msgctxt "#30100"
 msgid "Torrest - first run"
 msgstr ""
@@ -486,4 +490,28 @@ msgstr ""
 
 msgctxt "#30245"
 msgid "Torrent status"
+msgstr ""
+
+msgctxt "#30246"
+msgid "Finding peers"
+msgstr ""
+
+msgctxt "#30247"
+msgid "Fetching metadata"
+msgstr ""
+
+msgctxt "#30248"
+msgid "Buffering"
+msgstr ""
+
+msgctxt "#30249"
+msgid "Starting playback"
+msgstr ""
+
+msgctxt "#30250"
+msgid "Playing"
+msgstr ""
+
+msgctxt "#30251"
+msgid "Playback did not start"
 msgstr ""

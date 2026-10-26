@@ -11,6 +11,7 @@ import xbmcgui
 from lib import kodi
 from lib import settings
 from lib.constants import PLATFORM, LIB_NAME, EXE_NAME
+from lib.play_status import skin_ui_enabled
 from lib.torrest.api import Torrest, STATUS_FINISHED, STATUS_SEEDING, STATUS_PAUSED
 from lib.torrest_daemon import TorrestLibraryDaemon, TorrestExecutableDaemon, TorrestDaemonNotFoundError
 from lib.utils import sizeof_fmt, assure_unicode
@@ -212,7 +213,8 @@ class DownloadProgress(xbmc.Monitor, threading.Thread):
 
     def run(self):
         while not self.waitForAbort(5):
-            if self._enabled:
+            # A skin drawing its own torrent status (ultra.torrent.ui) replaces this dialog
+            if self._enabled and not skin_ui_enabled():
                 try:
                     self._update_progress()
                 except requests.exceptions.ConnectionError:

@@ -25,6 +25,10 @@ def get_metadata_timeout():
     return get_int_setting("metadata_timeout")
 
 
+def add_public_trackers():
+    return get_boolean_setting("add_trackers")
+
+
 def get_buffering_timeout():
     return get_int_setting("buffer_timeout")
 
