@@ -21,6 +21,7 @@ from lib.kodi import ADDON_PATH, ADDON_NAME, translate, notification, set_logger
 from lib.kodi_formats import is_music, is_picture, is_video, is_text
 from lib.play_status import PlayStatus, STATE_STARTING, STATE_BUFFERING, STATE_PLAYING
 from lib.player import TorrestPlayer
+from lib.prebuffer import PreBuffer
 from lib.torrest.api import Torrest, TorrestError, STATUS_SEEDING, STATUS_PAUSED
 from lib.utils import sizeof_fmt, ThreadLocal
 
@@ -505,42 +506,40 @@ def wait_for_metadata(info_hash):
 @plugin.route("/buffer_and_play/<info_hash>/<file_id>")
 @check_playable
 def buffer_and_play(info_hash, file_id):
-    api.download_file(info_hash, file_id, buffer=True)
-    if api.file_status(info_hash, file_id).buffering_progress < 100:
-        wait_for_buffering_completion(info_hash, file_id)
+    # The daemon's own buffering is skipped: PreBuffer reads the amounts set in the settings
+    api.download_file(info_hash, file_id, buffer=False)
+    wait_for_buffering_completion(info_hash, file_id)
     play(info_hash, file_id)
 
 
 def wait_for_buffering_completion(info_hash, file_id):
     close_busy_dialog()
     info = api.file_info(info_hash, file_id)
+    pre_buffer = PreBuffer(api.serve_url(info_hash, file_id), info.length,
+                           settings.get_buffer_start_size(), settings.get_buffer_end_size())
+    if pre_buffer.completed:
+        return
     of = translate(30244)
     timeout = settings.get_buffering_timeout()
-    last_time = last_done = 0
     start_time = time.time()
 
     monitor = Monitor()
     progress = PlayProgress()
+    pre_buffer.start()
 
     try:
-        while True:
+        while not pre_buffer.completed:
             current_time = time.time()
-            status = api.file_status(info_hash, file_id)
-            if status.buffering_progress >= 100:
-                break
-
-            play_status.update(STATE_BUFFERING, "{} {:d}%".format(translate(30248), int(status.buffering_progress)),
-                               progress=status.buffering_progress, torrent_status=api.torrent_status(info_hash),
-                               name=info.name)
-            total_done = status.buffering_total * status.buffering_progress / 100
-            speed = float(total_done - last_done) / (current_time - last_time)
-            last_time = current_time
-            last_done = total_done
+            status = api.torrent_status(info_hash)
+            done, total = pre_buffer.done, pre_buffer.total
+            percent = 100.0 * done / total
+            play_status.update(STATE_BUFFERING, "{} {:d}%".format(translate(30248), int(percent)),
+                               progress=percent, torrent_status=status, name=info.name)
             progress.update(
-                int(status.buffering_progress),
+                int(percent),
                 "{} - {:.2f}%\n{} {} {} - {}/s\n{}\n".format(
-                    get_state_string(status.state), status.buffering_progress, sizeof_fmt(total_done),
-                    of, sizeof_fmt(status.buffering_total), sizeof_fmt(speed), info.name))
+                    get_state_string(status.state), percent, sizeof_fmt(done),
+                    of, sizeof_fmt(total), sizeof_fmt(status.download_rate), info.name))
 
             if progress.iscanceled() or play_status.cancel_requested():
                 raise CanceledError("User canceled buffering", info_hash)
@@ -549,6 +548,7 @@ def wait_for_buffering_completion(info_hash, file_id):
             if monitor.waitForAbort(0.5):
                 raise PlayError("Abort requested")
     finally:
+        pre_buffer.stop()
         progress.close()
 
 

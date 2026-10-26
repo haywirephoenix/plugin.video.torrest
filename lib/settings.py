@@ -35,6 +35,14 @@ def get_trackers_mode():
     return get_int_setting("trackers")
 
 
+def get_buffer_start_size():
+    return get_int_setting("buffer_start") * 1024 * 1024
+
+
+def get_buffer_end_size():
+    return get_int_setting("buffer_end") * 1024 * 1024
+
+
 def get_buffering_timeout():
     return get_int_setting("buffer_timeout")
 

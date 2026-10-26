@@ -335,6 +335,14 @@ msgctxt "#30093"
 msgid "Disabled"
 msgstr ""
 
+msgctxt "#30094"
+msgid "Buffer before playing (MB)"
+msgstr ""
+
+msgctxt "#30095"
+msgid "Buffer at the end of the file (MB)"
+msgstr ""
+
 msgctxt "#30100"
 msgid "Torrest - first run"
 msgstr ""
