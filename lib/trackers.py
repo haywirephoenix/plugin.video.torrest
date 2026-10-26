@@ -33,8 +33,8 @@ DEFAULT_TRACKERS = (
     "udp://tracker.torrent.eu.org:451/announce",
     "udp://exodus.desync.com:6969/announce",
     "udp://explodie.org:6969/announce",
-    "udp://tracker.openbittorrent.com:6969/announce",
-    "udp://tracker.tiny-vps.com:6969/announce",
+    "udp://open.tracker.cl:1337/announce",
+    "udp://tracker.qu.ax:6969/announce",
 )
 
 TRACKER_RE = re.compile(r"(?:udp|https?|wss?)://[^\s,;\"'<>]+", re.IGNORECASE)
