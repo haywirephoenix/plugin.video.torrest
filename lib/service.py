@@ -12,7 +12,7 @@ from lib import kodi
 from lib import settings
 from lib import trackers
 from lib.constants import PLATFORM, LIB_NAME, EXE_NAME
-from lib.play_status import skin_ui_enabled, STATE_PROPERTY
+from lib.play_status import skin_ui_enabled, skin_osd_enabled, publish_download, clear_download, STATE_PROPERTY
 from lib.torrest.api import Torrest, STATUS_FINISHED, STATUS_SEEDING, STATUS_PAUSED
 from lib.torrest_daemon import TorrestLibraryDaemon, TorrestExecutableDaemon, TorrestDaemonNotFoundError
 from lib.utils import sizeof_fmt, assure_unicode
@@ -224,24 +224,57 @@ class DownloadProgress(xbmc.Monitor, threading.Thread):
         self.daemon = True
         self._api = self._enabled = self._dialog = None
         self._index = 0
+        self._published = False
+        self._player = xbmc.Player()
         self.onSettingsChanged()
 
     def run(self):
-        while not self.waitForAbort(5):
+        # A skin showing the download status in its OSD (ultra.torrent.osd) gets it about once a second
+        while not self.waitForAbort(1 if skin_osd_enabled() else 5):
             # A skin drawing its own torrent status (ultra.torrent.ui) replaces this dialog
             if self._enabled and not skin_ui_enabled():
                 try:
-                    self._update_progress()
+                    if skin_osd_enabled():
+                        self._close_dialog()
+                        self._publish_progress()
+                    else:
+                        self._clear_published()
+                        self._update_progress()
                 except requests.exceptions.ConnectionError:
                     self._close_dialog()
+                    self._clear_published()
                     logging.debug("Failed to update background progress")
             else:
                 self._close_dialog()
+                self._clear_published()
         self._close_dialog()
+        self._clear_published()
+
+    def _downloading(self):
+        return [t for t in self._api.torrents() if t.status.state not in (
+            STATUS_FINISHED, STATUS_SEEDING, STATUS_PAUSED)]
+
+    def _publish_progress(self):
+        if self._player.isPlaying() and ":{}/torrents/".format(settings.get_port()) in self._player.getPlayingFile():
+            # Torrest is playing: its player publishes the playing torrent's status
+            self._published = False
+            return
+        torrents = self._downloading()
+        if torrents:
+            publish_download(sum(t.status.progress for t in torrents) / len(torrents),
+                             sum(t.status.download_rate for t in torrents),
+                             sum(t.status.peers for t in torrents))
+            self._published = True
+        else:
+            self._clear_published()
+
+    def _clear_published(self):
+        if self._published:
+            clear_download()
+            self._published = False
 
     def _update_progress(self):
-        torrents = [t for t in self._api.torrents() if t.status.state not in (
-            STATUS_FINISHED, STATUS_SEEDING, STATUS_PAUSED)]
+        torrents = self._downloading()
         torrents_count = len(torrents)
 
         if torrents_count > 0:
