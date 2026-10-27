@@ -14,8 +14,10 @@ jobs:
     uses: haywirephoenix/repository.haywire/.github/workflows/publish-addon.yml@main
     with:
       # The zip with every platform's torrest binary (upstream's build.sh -a); Torrest
-      # picks its platform's at runtime.
+      # picks its platform's at runtime. build.sh reads a version tag first, so tag the
+      # checkout (only in the runner; nothing is pushed).
       build: >-
+        git tag -f "v$VERSION" &&
         ./scripts/build.sh -a -v "$VERSION" &&
         mv "build/$ADDON_ID-$VERSION.all.zip" "dist/$ADDON_ID-$VERSION.zip"
     secrets:
