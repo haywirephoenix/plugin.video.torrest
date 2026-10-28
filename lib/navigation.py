@@ -445,6 +445,29 @@ def play_magnet(magnet, file_id=None, index=None, buffer=True):
     play_info_hash(info_hash, file_id=index if file_id is None else file_id, buffer=buffer)
 
 
+@plugin.route("/download_magnet")
+@query_arg("magnet", arg_type=Types.string)
+@query_arg("file_id", required=False, arg_type=Types.integer)
+@query_arg("index", required=False, arg_type=Types.integer)
+def download_magnet(magnet, file_id=None, index=None):
+    """Downloads a magnet's torrent, or just one of its files (file_id / index), without playing
+    it, as the Torrents menu's Download does: for other add-ons (Ultra Player's Download). It's
+    then in Torrents, where its progress shows; a later play of it streams what's there."""
+    info_hash = api.add_magnet(with_trackers(magnet), ignore_duplicate=True, download=False)
+    file_id = index if file_id is None else file_id
+    if file_id is None:
+        api.download_torrent(info_hash)
+    else:
+        # A file can only be picked once the torrent's metadata (its file list) is in.
+        timeout, start, monitor = settings.get_metadata_timeout(), time.time(), Monitor()
+        while not api.torrent_status(info_hash).has_metadata:
+            if monitor.waitForAbort(0.5) or (0 < timeout < time.time() - start):
+                notification(translate(30238))
+                return
+        api.download_file(info_hash, file_id, buffer=False)
+    notification(translate(30243), time=2000)
+
+
 def add_for_play(add):
     """Adds the play's torrent, noting whether it is new (so an unstarted play can delete it)."""
     global play_torrent_added
