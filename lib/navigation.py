@@ -41,7 +41,6 @@ play_torrent_added = False
 QUEUED_RECOVERY_DELAY = 8
 
 
-
 class Types:
     @staticmethod
     def boolean(s):
