@@ -6,6 +6,10 @@ name="plugin.video.torrest"
 username="i96751414"
 repository="torrest-cpp"
 release="latest"
+# Builds of the same torrest version for platforms upstream doesn't release (see
+# scripts/build_webos_daemon.sh), on this repository's webos-torrest-<version> release
+extra_repository="haywirephoenix/plugin.video.torrest"
+extra_release_prefix="webos-torrest-"
 bin_path="${name}/resources/bin"
 lib_path="${name}/lib"
 
@@ -106,9 +110,8 @@ if [ "${clean}" == true ]; then
   rm -rf "${build_path}"
 fi
 
-# More on https://developer.github.com/v3/repos/releases/
-info "Getting ${release} release from ${username}/${repository}"
-response=$(curl -s -X GET "https://api.github.com/repos/${username}/${repository}/releases/${release}")
+function addReleaseAssets() {
+local response="${1}"
 for url in $(jq -er ".assets | .[] | .browser_download_url" <<<"${response}"); do
   file_name="$(basename "${url}")"
   platform=$(awk -F. '{print $(NF-1)}' <<<"${file_name}")
@@ -135,6 +138,21 @@ for url in $(jq -er ".assets | .[] | .browser_download_url" <<<"${response}"); d
   info "Updating ${zip_name} with (${platform}) binary and constants"
   (cd "${build_path}" && zip -9 -r -u "${zip_name}" "${binary_path}" "${lib_path}")
 done
+}
+
+# More on https://developer.github.com/v3/repos/releases/
+info "Getting ${release} release from ${username}/${repository}"
+response=$(curl -s -X GET "https://api.github.com/repos/${username}/${repository}/releases/${release}")
+addReleaseAssets "${response}"
+
+extra_release="${extra_release_prefix}$(jq -r ".tag_name" <<<"${response}" | sed "s/^v//")"
+info "Getting ${extra_release} release from ${extra_repository}"
+extra_response=$(curl -s -X GET "https://api.github.com/repos/${extra_repository}/releases/tags/${extra_release}")
+if jq -e ".assets" <<<"${extra_response}" >/dev/null; then
+  addReleaseAssets "${extra_response}"
+else
+  info "No ${extra_release} release: skipping its platforms"
+fi
 
 if [ "${all}" = true ] && [ -d "${build_path}/${bin_path}" ] && [ -n "$(ls -A "${build_path}/${bin_path}")" ]; then
   info "Generating zip with all binaries"
