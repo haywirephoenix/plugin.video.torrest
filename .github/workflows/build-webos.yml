@@ -1,0 +1,54 @@
+# Builds the torrest daemon for LG webOS (armv7, soft-float ABI) with scripts/build_webos_daemon.sh.
+# Run by hand. The zips are uploaded as an artifact; with "publish", they're also attached to
+# the release webos-torrest-<version> on this repository, where build.sh picks them up.
+name: Build webOS daemon
+
+on:
+  workflow_dispatch:
+    inputs:
+      torrest_version:
+        description: torrest-cpp tag to build
+        default: v0.0.8
+      publish:
+        description: Attach the zips to the webos-torrest-<version> release
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      TORREST_VERSION: ${{ inputs.torrest_version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: sudo apt-get update -q && sudo apt-get install -yq cmake zip wget
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/webos-build/deps
+          key: webos-deps-${{ inputs.torrest_version }}-${{ hashFiles('scripts/build_webos_daemon.sh') }}
+
+      - name: Build
+        run: ./scripts/build_webos_daemon.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: torrest-webos-${{ inputs.torrest_version }}
+          path: build/webos/*.zip
+
+      - name: Publish
+        if: ${{ inputs.publish }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="webos-torrest-${TORREST_VERSION#v}"
+          gh release view "$tag" >/dev/null 2>&1 ||
+            gh release create "$tag" --title "torrest ${TORREST_VERSION} for webOS (soft-float armv7)" \
+              --notes "Built by the Build webOS daemon workflow with webosbrew's NDK."
+          gh release upload "$tag" build/webos/*.zip --clobber
