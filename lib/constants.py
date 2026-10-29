@@ -17,10 +17,17 @@ class Arch:
     arm = "arm"
     arm64 = "arm64"
     armv7 = "armv7"
+    # armv7 with the soft-float ABI (gnueabi), e.g. LG webOS: hard-float (armhf) builds can't run there
+    armv7_softfp = "armv7_softfp"
 
 
 SHARED_LIB_EXTENSIONS = {System.linux: ".so", System.android: ".so", System.darwin: ".dylib", System.windows: ".dll"}
 EXECUTABLE_EXTENSIONS = {System.windows: ".exe"}
+
+
+def is_soft_float_arm():
+    # Only the soft-float program loader: an armhf binary fails with "No such file or directory"
+    return not os.path.exists("/lib/ld-linux-armhf.so.3") and os.path.exists("/lib/ld-linux.so.3")
 
 
 def get_platform():
@@ -38,7 +45,7 @@ def get_platform():
             arch = Arch.arm64 if is_arch64 else Arch.arm
     elif system == System.linux:
         if "armv7" in machine:
-            arch = Arch.armv7
+            arch = Arch.armv7_softfp if is_soft_float_arm() else Arch.armv7
         elif "aarch" in machine:
             arch = Arch.arm64 if is_arch64 else Arch.armv7
         elif "arm" in machine:
