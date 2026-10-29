@@ -80,6 +80,7 @@ build() {
   local name="${1}" type="${2}"
   shift 2
   info "Building ${name}"
+  mkdir -p "${work}/out-${name}"
   cmake -S "${src}" -B "${work}/build-${name}" -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE="${toolchain}" \
     -DBoost_USE_STATIC_LIBS=ON -DOPENSSL_USE_STATIC_LIBS=ON -Dtarget_path="${work}/out-${name}/" \
     -DCMAKE_"${type}"_LINKER_FLAGS="-static-libstdc++ -static-libgcc" "$@"
