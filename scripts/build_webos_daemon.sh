@@ -16,6 +16,9 @@ NDK_NAME="arm-webos-linux-gnueabi_sdk-buildroot"
 TRIPLE="arm-webos-linux-gnueabi"
 PLATFORM="linux_armv7_softfp"
 
+# CMake 4 rejects projects declaring a minimum below 3.5 (oatpp 1.3.0 does)
+export CMAKE_POLICY_VERSION_MINIMUM=3.5
+
 repo_path="$(dirname "$(dirname "$(realpath "${0}")")")"
 out_path="${repo_path}/build/webos"
 work="${WORK_DIR:-${HOME}/webos-build}"
