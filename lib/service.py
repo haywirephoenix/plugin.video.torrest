@@ -14,7 +14,8 @@ from lib import trackers
 from lib.constants import PLATFORM, LIB_NAME, EXE_NAME
 from lib.play_status import skin_ui_enabled, skin_osd_enabled, publish_download, clear_download, STATE_PROPERTY
 from lib.torrest.api import Torrest, STATUS_FINISHED, STATUS_SEEDING, STATUS_PAUSED
-from lib.torrest_daemon import TorrestLibraryDaemon, TorrestExecutableDaemon, TorrestDaemonNotFoundError
+from lib.torrest_daemon import TorrestLibraryDaemon, TorrestExecutableDaemon, TorrestDaemonNotFoundError, \
+    TorrestDaemonStartError
 from lib.utils import sizeof_fmt, assure_unicode
 
 BASE_DIRECTORY = os.path.join(kodi.ADDON_PATH, "resources", "bin", PLATFORM)
@@ -417,3 +418,6 @@ def run():
             settings.set_service_enabled(False)
             xbmcgui.Dialog().ok(kodi.ADDON_NAME, kodi.translate(30103))
             kodi.open_settings()
+    except TorrestDaemonStartError as e:
+        logging.error("Aborting service: %s", e)
+        xbmcgui.Dialog().ok(kodi.ADDON_NAME, str(e))

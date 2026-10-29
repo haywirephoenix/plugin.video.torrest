@@ -2,6 +2,7 @@ import hashlib
 import logging
 import os
 import shutil
+import struct
 
 from lib.daemon import Daemon
 from lib.torrest.lib import TorrestLib
@@ -26,6 +27,49 @@ def get_current_app_id():
 
 class TorrestDaemonNotFoundError(Exception):
     pass
+
+
+class TorrestDaemonStartError(Exception):
+    """The daemon (or library) exists but can't run on this device."""
+    pass
+
+
+def elf_interpreter(path):
+    """The program loader an ELF executable asks for (e.g. /lib/ld-linux-armhf.so.3), or None."""
+    try:
+        with open(path, "rb") as f:
+            data = f.read(64 * 1024)
+        if data[:4] != b"\x7fELF":
+            return None
+        is64, endian = data[4] == 2, "<" if data[5] == 1 else ">"
+        if is64:
+            ph_off, = struct.unpack_from(endian + "Q", data, 32)
+            ph_size, ph_num = struct.unpack_from(endian + "HH", data, 54)
+        else:
+            ph_off, = struct.unpack_from(endian + "I", data, 28)
+            ph_size, ph_num = struct.unpack_from(endian + "HH", data, 42)
+        for i in range(ph_num):
+            entry = ph_off + i * ph_size
+            p_type, = struct.unpack_from(endian + "I", data, entry)
+            if p_type == 3:  # PT_INTERP
+                if is64:
+                    offset, = struct.unpack_from(endian + "Q", data, entry + 8)
+                    size, = struct.unpack_from(endian + "Q", data, entry + 32)
+                else:
+                    offset, size = struct.unpack_from(endian + "I", data, entry + 4)[0], \
+                                   struct.unpack_from(endian + "I", data, entry + 16)[0]
+                return data[offset:offset + size].rstrip(b"\0").decode("utf-8", "replace")
+    except (IOError, OSError, struct.error, IndexError):
+        pass
+    return None
+
+
+def start_error(path, error):
+    """Why the daemon at path can't start, in words: usually a build for another kind of system."""
+    interpreter = elf_interpreter(path)
+    if interpreter and not os.path.exists(interpreter):
+        return "This Torrest daemon build needs {}, which this device doesn't have".format(interpreter)
+    return "Torrest daemon can't run on this device: {}".format(error)
 
 
 class ConfigError(LookupError):
@@ -106,10 +150,13 @@ class TorrestExecutableDaemon(TorrestDaemon):
         self._daemon.kill_leftover_process()
 
     def start(self):
-        self._daemon.start(
-            "--port", str(self.get_config("port")),
-            "--settings", self.get_config("settings_path"),
-            level=logging.INFO, path=self.get_config("log_path"))
+        try:
+            self._daemon.start(
+                "--port", str(self.get_config("port")),
+                "--settings", self.get_config("settings_path"),
+                level=logging.INFO, path=self.get_config("log_path"))
+        except OSError as e:
+            raise TorrestDaemonStartError(start_error(self._path, e))
 
     def stop(self):
         self._daemon.stop()
@@ -124,7 +171,10 @@ class TorrestLibraryDaemon(TorrestDaemon):
         super(TorrestLibraryDaemon, self).__init__(
             name, directory, config=config, dest_dir=dest_dir,
             android_find_dest_dir=android_find_dest_dir, android_extra_dirs=android_extra_dirs)
-        self._daemon = TorrestLib(self._path)
+        try:
+            self._daemon = TorrestLib(self._path)
+        except OSError as e:
+            raise TorrestDaemonStartError("Torrest library can't load on this device: {}".format(e))
         self._work_dir = work_dir
 
     def setup(self):
