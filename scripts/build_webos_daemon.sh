@@ -75,7 +75,12 @@ if [ ! -f "${prefix}/.done" ]; then
   touch "${prefix}/.done"
 fi
 
-# The C++ runtime is linked in, so only libc/libm/libpthread/libdl come from the TV
+# The C++ runtime and libatomic are linked in, so only glibc's libraries come from the TV.
+# libatomic is asked for as -latomic, which finds the shared one first: a folder with only
+# the static one, searched first, gets that instead.
+static_libs="${work}/static-libs"
+mkdir -p "${static_libs}"
+cp "$("${TRIPLE}-gcc" -print-file-name=libatomic.a)" "${static_libs}/"
 build() {
   local name="${1}" type="${2}"
   shift 2
@@ -83,7 +88,7 @@ build() {
   mkdir -p "${work}/out-${name}"
   cmake -S "${src}" -B "${work}/build-${name}" -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE="${toolchain}" \
     -DBoost_USE_STATIC_LIBS=ON -DOPENSSL_USE_STATIC_LIBS=ON -Dtarget_path="${work}/out-${name}/" \
-    -DCMAKE_"${type}"_LINKER_FLAGS="-static-libstdc++ -static-libgcc" "$@"
+    -DCMAKE_"${type}"_LINKER_FLAGS="-L${static_libs} -static-libstdc++ -static-libgcc" "$@"
   cmake --build "${work}/build-${name}" --target torrest -- -j "${jobs}"
 }
 build torrest EXE
@@ -100,6 +105,12 @@ check() {
     exit 1
   fi
   "${TRIPLE}-readelf" -d "${file}" | grep NEEDED
+  # Anything else may not be on the TV
+  if "${TRIPLE}-readelf" -d "${file}" | grep NEEDED |
+    grep -vqE "\[(libc\.so\.6|libm\.so\.6|libdl\.so\.2|libpthread\.so\.0|librt\.so\.1|ld-linux\.so\.3)\]"; then
+    echo "ERROR: ${file} needs a library outside glibc" >&2
+    exit 1
+  fi
   echo "Newest glibc version needed: $("${TRIPLE}-objdump" -T "${file}" | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1)"
 }
 check "${work}/out-torrest/torrest"
