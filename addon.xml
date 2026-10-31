@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<addon id="plugin.video.torrest" name="Torrest" provider-name="i96751414" version="0.0.24">
+<addon id="plugin.video.torrest" name="Torrest" provider-name="i96751414" version="0.0.25">
     <requires>
         <!--<import addon="xbmc.python" version="3.0.0"/>-->
         <import addon="script.module.requests" version="2.22.0"/>
@@ -16,6 +16,7 @@
         <summary lang="en">Torrest on Kodi</summary>
         <description lang="en">Torrest is a service with a rest API which allows torrent streaming.</description>
         <news>
+- [0.0.25] Cancels when the skin's loading screen is left with Back, even before a play starts, and never starts an already buffered play after it
 - [0.0.24] webOS: a soft-float daemon build for LG TVs (upstream's armv7 one can't run there), and a clear message instead of a crash when the daemon can't run on a device
 - [0.0.23] download_magnet: download a torrent, or one of its files, without playing it (for Ultra Player's Download)
 - Update torrest binary to v0.0.8
