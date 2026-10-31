@@ -698,6 +698,10 @@ def play(info_hash, file_id):
     # Resolving now would leave this stream queued behind the newer play's, and Kodi plays it
     # when that one stops (even while quitting)
     check_superseded()
+    # Cancelled with nothing left to wait for (already downloaded and buffered): don't start it
+    # behind whatever the skin went back to
+    if status.cancel_requested():
+        raise CanceledError("User canceled before playback", info_hash)
     status.update(STATE_BUFFERING, translate(30249), progress=100, name=name)
     setResolvedUrl(plugin.handle, True, file_li)
 

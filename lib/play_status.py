@@ -8,7 +8,9 @@ background progress dialog.
 A skin that draws its own buffering UI sets "ultra.torrent.ui" to "1"; while it is set Torrest
 shows none of its own buffering/progress dialogs. Either way, while a play starts and buffers
 Torrest keeps the "torrest.*" properties below up to date, and a skin can cancel the play by
-setting "torrest.cancel" to "1".
+setting "torrest.cancel" to "1". skin.ultra's loading screen also sets "ultra.loading.cancel"
+when it's left with Back, and clears it when the next play starts: that cancels too, so a Back
+pressed before this play started (between choosing a source and Torrest starting) still counts.
 """
 
 import threading
@@ -28,6 +30,7 @@ DOWNLOAD_PROGRESS_PROPERTY = "torrest.download.progress"
 DOWNLOAD_SPEED_PROPERTY = "torrest.download.speed"
 DOWNLOAD_PEERS_PROPERTY = "torrest.download.peers"
 CANCEL_PROPERTY = "torrest.cancel"
+SKIN_CANCEL_PROPERTY = "ultra.loading.cancel"
 STATE_PROPERTY = "torrest.state"
 # Which play owns the properties, so a play that ends late doesn't clear a newer play's status
 OWNER_PROPERTY = "torrest.owner"
@@ -127,7 +130,7 @@ class PlayStatus(object):
         return self._home.getProperty(LATEST_PROPERTY) != self._token
 
     def cancel_requested(self):
-        return self._home.getProperty(CANCEL_PROPERTY) == "1"
+        return "1" in (self._home.getProperty(CANCEL_PROPERTY), self._home.getProperty(SKIN_CANCEL_PROPERTY))
 
     def playing(self, label):
         if not self._owns():
