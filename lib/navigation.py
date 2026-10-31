@@ -583,7 +583,8 @@ def play_info_hash(info_hash, file_id=None, buffer=True):
             logging.warning("File %s not found in %s, choosing a file instead", file_id, info_hash)
             file_id = None
         elif not is_video(chosen.path):
-            logging.warning("File %s in %s isn't a video (%s), choosing a file instead", file_id, info_hash, chosen.path)
+            logging.warning("File %s in %s isn't a video (%s), choosing a file instead",
+                            file_id, info_hash, chosen.path)
             file_id = None
 
     if file_id is None:
