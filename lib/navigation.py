@@ -20,7 +20,7 @@ from lib.kodi import ADDON_PATH, ADDON_NAME, translate, notification, set_logger
     busy_dialog, close_busy_dialog
 from lib.kodi_formats import is_music, is_picture, is_video, is_text
 from lib.play_status import PlayStatus, STATE_STARTING, STATE_BUFFERING, STATE_PLAYING, skin_osd_enabled
-from lib.player import TorrestPlayer
+from lib.player import TorrestPlayer, PlayerCancelledError
 from lib.prebuffer import PreBuffer
 from lib.torrest.api import Torrest, TorrestError, STATUS_SEEDING, STATUS_PAUSED, STATUS_QUEUED
 from lib.utils import sizeof_fmt, ThreadLocal
@@ -198,6 +198,10 @@ def handle_player_stop(info_hash, name=None, watched=None, added=False, initial_
         return
     if name is None:
         name = info.name
+    if play_status is not None and play_status.torrent_taken(info_hash):
+        # Played again straight away: the newer play has it now (pausing it would stop its stream)
+        logging.info("Keeping %s: playing again", name)
+        return
 
     # Only the whole torrent can be deleted: never a pack (a season, say) for one of its videos
     if is_pack(info_hash):
@@ -207,33 +211,63 @@ def handle_player_stop(info_hash, name=None, watched=None, added=False, initial_
         unstarted = added if watched is None else watched < settings.get_unstarted_percent()
         watched_to_end = watched is not None and watched >= settings.get_watched_percent()
 
-    if settings.delete_unstarted() and unstarted:
-        logging.info("Deleting %s: stopped near the start", name)
-        remove_torrent_files(info_hash)
-        return
-    if settings.delete_watched() and watched_to_end:
-        logging.info("Deleting %s: watched to the end", name)
-        remove_torrent_files(info_hash)
-        return
-
-    stop_action = settings.get_on_playback_stop_action()
-    if stop_action != settings.PlaybackStopAction.IGNORE:
-        sleep(int(initial_delay * 1000))
-        start_time = time.time()
-        while getCondVisibility("Window.IsActive(busydialog)") and not 0 < listing_timeout < time.time() - start_time:
-            sleep(100)
-
+    reason = ("stopped near the start" if settings.delete_unstarted() and unstarted else
+              "watched to the end" if settings.delete_watched() and watched_to_end else None)
+    if reason:
+        # Delete action Ask: a no keeps it (and isn't asked again by the stop action below)
+        if (settings.get_delete_action() == settings.DeleteAction.AUTO
+                or ask_to_delete(name, initial_delay, listing_timeout)):
+            if play_status is not None and play_status.torrent_taken(info_hash):
+                logging.info("Keeping %s: played again while asking", name)
+                return
+            logging.info("Deleting %s: %s", name, reason)
+            remove_torrent_files(info_hash)
+            return
+        logging.info("Keeping %s (%s): not deleted when asked", name, reason)
+    else:
+        stop_action = settings.get_on_playback_stop_action()
         if (stop_action == settings.PlaybackStopAction.DELETE
-                or Dialog().yesno(ADDON_NAME, name + "\n" + translate(30241))):
+                or stop_action == settings.PlaybackStopAction.ASK_TO_DELETE
+                and ask_to_delete(name, initial_delay, listing_timeout)):
             remove_torrent_files(info_hash)
             return
 
+    if play_status is not None and play_status.torrent_taken(info_hash):
+        logging.info("Keeping %s: played again while asking", name)
+        return
     if settings.stop_on_exit():
         # Kept for later, but no downloading or seeding in the background
         try:
             api.pause_torrent(info_hash)
         except TorrestError as e:
             logging.debug("Failed to pause %s: %s", info_hash, e)
+
+
+def ask_to_delete(name, initial_delay, listing_timeout):
+    # Once the video has closed and the window Kodi goes back to is up (not over the last frame,
+    # which stuttered and left trails), and after its listing's busy dialog
+    start_time = time.time()
+    while (getCondVisibility("Player.HasMedia | Window.IsActive(fullscreenvideo)")
+           and not 0 < listing_timeout < time.time() - start_time):
+        sleep(100)
+    sleep(int(max(initial_delay, 1) * 1000))
+    start_time = time.time()
+    while getCondVisibility("Window.IsActive(busydialog)") and not 0 < listing_timeout < time.time() - start_time:
+        sleep(100)
+    return Dialog().yesno(ADDON_NAME, name + "\n" + translate(30241))
+
+
+def wait_for_daemon():
+    """Waits for the daemon to answer, up to the service timeout: it takes a while to start with
+    Kodi (restoring its torrents), and a listing opened before then would fail."""
+    start_time = time.time()
+    monitor = Monitor()
+    while True:
+        try:
+            return api.torrents(status=False)
+        except requests.exceptions.ConnectionError:
+            if time.time() - start_time > settings.get_daemon_timeout() or monitor.waitForAbort(0.5):
+                raise
 
 
 def is_pack(info_hash):
@@ -265,6 +299,7 @@ def index():
 @plugin.route("/torrents")
 @check_directory
 def torrents():
+    wait_for_daemon()
     for torrent in api.torrents(status=True):
         context_menu_items = [
             (translate(30235), media(play_info_hash, info_hash=torrent.info_hash))
@@ -346,6 +381,7 @@ def sort_items(files):
 @query_arg("folder", required=False, arg_type=Types.string)
 @check_directory
 def torrent_files(info_hash, folder=""):
+    wait_for_daemon()
     if folder or settings.folder_listing_enabled():
         items = api.items(info_hash, folder, status=True)
         if not folder and settings.skip_root_folder():
@@ -531,6 +567,7 @@ def play_file(path, file_id=None, index=None, buffer=True):
 def play_info_hash(info_hash, file_id=None, buffer=True):
     global play_torrent
     play_torrent = info_hash
+    play_status.set_torrent(info_hash)
     status = api.torrent_status(info_hash)
     if status.paused:
         # Stopped when an earlier play ended (or when Kodi started)
@@ -538,9 +575,16 @@ def play_info_hash(info_hash, file_id=None, buffer=True):
     if not status.has_metadata:
         wait_for_metadata(info_hash)
 
-    if file_id is not None and file_id not in [f.id for f in api.files(info_hash, status=False)]:
-        logging.warning("File %s not found in %s, choosing a file instead", file_id, info_hash)
-        file_id = None
+    if file_id is not None:
+        # A file index that isn't a video (a pack's .nfo or sample folder, an index from another
+        # listing of the files) would fail to play: choose among the videos instead
+        chosen = next((f for f in api.files(info_hash, status=False) if f.id == file_id), None)
+        if chosen is None:
+            logging.warning("File %s not found in %s, choosing a file instead", file_id, info_hash)
+            file_id = None
+        elif not is_video(chosen.path):
+            logging.warning("File %s in %s isn't a video (%s), choosing a file instead", file_id, info_hash, chosen.path)
+            file_id = None
 
     if file_id is None:
         files = api.files(info_hash, status=False)
@@ -637,6 +681,8 @@ def buffer_and_play(info_hash, file_id):
 def wait_for_buffering_completion(info_hash, file_id):
     close_busy_dialog()
     info = api.file_info(info_hash, file_id)
+    if api.file_status(info_hash, file_id).total_done >= info.length:
+        return  # downloaded: nothing to wait for (reading its buffer back showed "Buffering" for nothing)
     pre_buffer = PreBuffer(api.serve_url(info_hash, file_id), info.length,
                            settings.get_buffer_start_size(), settings.get_buffer_end_size())
     if pre_buffer.completed:
@@ -718,9 +764,12 @@ def play(info_hash, file_id):
                 download_status_handler=(lambda: api.torrent_status(info_hash)) if skin_osd else None,
                 on_start_handler=lambda: status.playing(translate(30250)),
                 active_handler=lambda: not status.superseded(),
+                cancel_handler=status.cancel_requested,
                 on_close_handler=on_close,
         ) as player:
             player.handle_events(url=serve_url)
+    except PlayerCancelledError:
+        logging.info("Loading screen left before the player started: not playing %s", name)
     except Exception as e:
         logging.error("Caught exception while playing file: %s", e, exc_info=True)
 

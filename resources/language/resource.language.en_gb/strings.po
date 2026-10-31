@@ -619,3 +619,15 @@ msgstr ""
 msgctxt "#30251"
 msgid "Playback did not start"
 msgstr ""
+
+msgctxt "#30252"
+msgid "Delete action"
+msgstr ""
+
+msgctxt "#30253"
+msgid "Auto"
+msgstr ""
+
+msgctxt "#30254"
+msgid "Ask"
+msgstr ""

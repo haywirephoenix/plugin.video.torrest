@@ -19,6 +19,11 @@ class PlaybackStopAction:
     IGNORE = 2
 
 
+class DeleteAction:
+    AUTO = 0
+    ASK = 1
+
+
 def get_port():
     return get_int_setting("port")
 
@@ -69,6 +74,10 @@ def get_on_playback_stop_action():
 
 def delete_unstarted():
     return get_boolean_setting("delete_unstarted")
+
+
+def get_delete_action():
+    return get_int_setting("delete_action")
 
 
 def get_unstarted_percent():

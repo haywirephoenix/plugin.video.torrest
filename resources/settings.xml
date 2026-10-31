@@ -25,6 +25,8 @@
         <setting id="delete_watched" type="bool" label="30098" default="true"/>
         <setting id="watched_percent" type="slider" label="30099" option="int" range="50,1,100" default="90"
                  enable="eq(-1,true)" subsetting="true"/>
+        <!-- For the two rules above: delete straight away, or ask first -->
+        <setting id="delete_action" type="enum" label="30252" default="1" lvalues="30253|30254"/>
         <setting id="stop_on_exit" type="bool" label="30107" default="true"/>
         <setting id="stop_when_complete" type="bool" label="30108" default="true"/>
         <setting id="stop_at_startup" type="bool" label="30109" default="true"/>

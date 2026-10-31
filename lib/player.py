@@ -24,6 +24,10 @@ class PlayerUrlError(Exception):
     pass
 
 
+class PlayerCancelledError(Exception):
+    pass
+
+
 class Player(object):
     def __init__(self):
         super(Player, self).__init__()
@@ -47,9 +51,17 @@ class Player(object):
         """False to stop following playback without the stop callback (another play took over)."""
         return True
 
+    def is_cancelled(self):
+        """True to stop waiting for playback to start (the skin's loading screen was left)."""
+        return False
+
     def handle_events(self, url=None, timeout=60, period=0.2):
         start_time = time.time()
         while True:
+            if self.is_cancelled():
+                if self.is_active():
+                    self._player.stop()  # Kodi started it after all: nothing plays in the background
+                raise PlayerCancelledError("Cancelled before the player started")
             if self.is_active():
                 if not url:
                     break
@@ -121,9 +133,10 @@ class Player(object):
 
 class TorrestPlayer(Player):
     def __init__(self, text_handler=None, on_start_handler=None, on_close_handler=None, download_status_handler=None,
-                 active_handler=None):
+                 active_handler=None, cancel_handler=None):
         super(TorrestPlayer, self).__init__()
         self._active_handler = active_handler
+        self._cancel_handler = cancel_handler
         self._stopped = False
         self._text_handler = text_handler
         # Returns the playing torrent's status, published for the skin's OSD (see lib/play_status.py)
@@ -135,6 +148,9 @@ class TorrestPlayer(Player):
 
     def is_tracking(self):
         return self._active_handler is None or self._active_handler()
+
+    def is_cancelled(self):
+        return self._cancel_handler is not None and self._cancel_handler()
 
     # noinspection PyAttributeOutsideInit
     def on_playback_started(self):

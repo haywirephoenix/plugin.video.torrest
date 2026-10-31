@@ -31,11 +31,14 @@ DOWNLOAD_SPEED_PROPERTY = "torrest.download.speed"
 DOWNLOAD_PEERS_PROPERTY = "torrest.download.peers"
 CANCEL_PROPERTY = "torrest.cancel"
 SKIN_CANCEL_PROPERTY = "ultra.loading.cancel"
+SKIN_LOADING_WINDOW = 1111  # the skin's loading screen
 STATE_PROPERTY = "torrest.state"
 # Which play owns the properties, so a play that ends late doesn't clear a newer play's status
 OWNER_PROPERTY = "torrest.owner"
 # The newest play (never cleared), so older plays still running know they were replaced
 LATEST_PROPERTY = "torrest.latest"
+# The newest play's torrent, so an older play's stop handling leaves it alone (no pause, no delete)
+LATEST_TORRENT_PROPERTY = "torrest.latest.torrent"
 PROPERTIES = ("state", "progress", "label", "speed", "peers", "seeds", "name", "error")
 
 STATE_STARTING = "starting"
@@ -110,6 +113,7 @@ class PlayStatus(object):
         self._clear_properties()
         self._home.setProperty(OWNER_PROPERTY, self._token)
         self._home.setProperty(LATEST_PROPERTY, self._token)
+        self._home.clearProperty(LATEST_TORRENT_PROPERTY)
         self.state = STATE_STARTING
         self._set(state=STATE_STARTING, progress=0)
 
@@ -129,6 +133,14 @@ class PlayStatus(object):
         """True once a newer play started (e.g. another episode was chosen while this one buffered)."""
         return self._home.getProperty(LATEST_PROPERTY) != self._token
 
+    def set_torrent(self, info_hash):
+        if not self.superseded():
+            self._home.setProperty(LATEST_TORRENT_PROPERTY, info_hash)
+
+    def torrent_taken(self, info_hash):
+        """True when a newer play is playing this torrent (the same title played again)."""
+        return self.superseded() and self._home.getProperty(LATEST_TORRENT_PROPERTY) == info_hash
+
     def cancel_requested(self):
         return "1" in (self._home.getProperty(CANCEL_PROPERTY), self._home.getProperty(SKIN_CANCEL_PROPERTY))
 
@@ -137,7 +149,10 @@ class PlayStatus(object):
             return
         self.state = STATE_PLAYING
         self._set(state=STATE_PLAYING, progress=100, label=label)
-        if self.skin_ui and not xbmc.getCondVisibility("Window.IsActive(fullscreenvideo)"):
+        # Not while the skin's loading screen is up: it closes once the picture shows (after Kodi's
+        # refresh rate switch), and closing it now left an empty fullscreen window for seconds
+        if (self.skin_ui and not xbmc.getCondVisibility("Window.IsActive(fullscreenvideo)")
+                and not xbmc.getCondVisibility("Window.IsVisible({})".format(SKIN_LOADING_WINDOW))):
             # Kodi doesn't go fullscreen when playback starts under a modal dialog (e.g. a video
             # info page left open after the skin's loading screen closed): the video would play
             # unseen behind it.
