@@ -7,7 +7,10 @@ A skin can draw it its own way with a TorrestManager.xml of its own: see that fi
 row properties it uses.
 """
 import logging
+import os
+import re
 import threading
+import time
 
 import requests
 from xbmc import Monitor
@@ -15,15 +18,76 @@ from xbmcgui import WindowXML, Dialog, ListItem, ACTION_CONTEXT_MENU, ACTION_NAV
     ACTION_PREVIOUS_MENU
 
 from lib import navigation as nav, settings
-from lib.kodi import translate, notification
+from lib.kodi import translate, notification, get_setting, translatePath
 from lib.kodi_formats import is_music, is_picture, is_text, is_video
 from lib.torrest.api import TorrestError, STATUS_SEEDING, STATUS_PAUSED
-from lib.utils import sizeof_fmt
+from lib.utils import sizeof_fmt, assure_unicode
 
 ADD_BUTTON_ID = 100
 LIST_ID = 200
 REFRESH_INTERVAL = 1
 INDENT = "      "
+# libtorrent's added_time in a fast resume file (bencoded: dictionary keys come sorted, so it's early)
+ADDED_TIME = re.compile(br"10:added_timei(\d+)e")
+ADDED_TIME_READ_SIZE = 4096
+
+
+# Names in natural order ("2" before "10"), whatever their case
+name_key = nav.natural_sort_key(lambda name: name.lower())
+
+# The orders the table can list in: torrents, and the folders and files under them (each folder's
+# folders come before its files). Each is a key function and whether it's highest first; a
+# setting can choose among them later (TORRENT_ORDER / CHILD_ORDER are what's used).
+TORRENT_ORDERS = {
+    "added": (lambda torrent, added_times: added_times.get(torrent.info_hash), True),
+    "name": (lambda torrent, added_times: name_key(torrent.name), False),
+    "size": (lambda torrent, added_times: torrent.size, True),
+}
+CHILD_ORDERS = {
+    "name": (lambda item: name_key(item.name), False),
+    "size": (lambda item: item.length, True),
+}
+TORRENT_ORDER = "added"
+CHILD_ORDER = "name"
+
+
+class AddedTimes(object):
+    """When each torrent was added: libtorrent's added_time, in the fast resume file the daemon keeps
+    in its torrents folder (<info hash>.fastresume); until that's written, its .torrent or .magnet
+    file's time. With the daemon elsewhere (the service off) there are none, and the daemon's own
+    order stays."""
+
+    def __init__(self):
+        path = get_setting("s:torrents_path")
+        self._path = assure_unicode(translatePath(path)) if settings.service_enabled() else None
+        self._times = {}
+
+    def get(self, info_hash):
+        if info_hash in self._times:
+            return self._times[info_hash]
+        if self._path is None:
+            return 0
+        base = os.path.join(self._path, info_hash.lower())
+        try:
+            with open(base + ".fastresume", "rb") as f:
+                match = ADDED_TIME.search(f.read(ADDED_TIME_READ_SIZE))
+            if match:
+                # It doesn't change: read once
+                self._times[info_hash] = int(match.group(1))
+                return self._times[info_hash]
+        except (IOError, OSError):
+            pass
+        for extension in (".torrent", ".magnet"):
+            try:
+                return os.path.getmtime(base + extension)
+            except OSError:
+                pass
+        return time.time()  # just added: nothing written yet
+
+
+def sort_by(items, order, *args):
+    key, highest_first = order
+    items.sort(key=lambda item: key(item, *args), reverse=highest_first)
 
 
 class Row(object):
@@ -62,6 +126,7 @@ class TorrentManager(WindowXML):
         self._wake = threading.Event()
         self._stop = threading.Event()
         self._thread = None
+        self._added_times = AddedTimes()
         # Whether the list should take the focus once it has rows (an empty list can't have it)
         self._focus_list = True
         # A built-in to run once the window has closed (a play)
@@ -209,7 +274,9 @@ class TorrentManager(WindowXML):
         with self._lock:
             expanded = set(self._expanded)
         rows = []
-        for torrent in nav.api.torrents(status=True):
+        torrents = nav.api.torrents(status=True)
+        sort_by(torrents, TORRENT_ORDERS[TORRENT_ORDER], self._added_times)
+        for torrent in torrents:
             rows.append(Row("torrent", torrent.info_hash, torrent.info_hash, 0, torrent))
             if torrent.info_hash in expanded:
                 rows.extend(self._children(torrent.info_hash, "", 1, expanded, torrent.status.paused))
@@ -226,8 +293,8 @@ class TorrentManager(WindowXML):
             folders, files = items.folders, items.files
         else:
             folders, files = [], api.files(info_hash, status=True)
-        nav.sort_items(folders)
-        nav.sort_items(files)
+        sort_by(folders, CHILD_ORDERS[CHILD_ORDER])
+        sort_by(files, CHILD_ORDERS[CHILD_ORDER])
 
         rows = []
         for f in folders:
