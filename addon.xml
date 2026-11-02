@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<addon id="plugin.video.torrest" name="Torrest" provider-name="i96751414" version="0.0.29">
+<addon id="plugin.video.torrest" name="Torrest" provider-name="i96751414" version="0.0.30">
     <requires>
         <!--<import addon="xbmc.python" version="3.0.0"/>-->
         <import addon="script.module.requests" version="2.22.0"/>
@@ -16,6 +16,7 @@
         <summary lang="en">Torrest on Kodi</summary>
         <description lang="en">Torrest is a service with a rest API which allows torrent streaming.</description>
         <news>
+- [0.0.30] Torrent manager: Torrest opens straight to a live table of its torrents (size, done, status, speeds, seeds, peers), whose rows expand in place to their files; Add torrent/magnet dialog redrawn at 1080i in the same colours
 - [0.0.29] Videos folder for other add-ons (a pack's episodes); quiet downloads (silent); stop on exit leaves a torrent downloading ahead running; Keep packs (on): the stop action never deletes a pack; Delete watched episodes from packs (off): deletes just the watched episode's file
 - [0.0.28] Pauses when the download falls behind playback and carries on once Resume once ahead by is ready (Player settings); publishes the ready range for skin.ultra's progress line
 - [0.0.27] Settings sorted into categories (Player, Deletion, Timeouts, Torrent, Logging) with help text on the timeouts; buffering, metadata and piece wait limits each have an on/off toggle; the unused buffer size setting is hidden
