@@ -16,7 +16,7 @@ from xbmcplugin import addDirectoryItem, endOfDirectory, setResolvedUrl
 
 from lib import settings, trackers
 from lib.dialog import DialogInsert
-from lib.kodi import ADDON_PATH, ADDON_NAME, translate, notification, set_logger, refresh, show_picture, \
+from lib.kodi import ADDON_ID, ADDON_PATH, ADDON_NAME, translate, notification, set_logger, refresh, show_picture, \
     busy_dialog, close_busy_dialog
 from lib.kodi_formats import is_music, is_picture, is_video, is_text
 from lib.play_status import PlayStatus, STATE_STARTING, STATE_BUFFERING, STATE_PLAYING, skin_osd_enabled
@@ -237,9 +237,15 @@ def handle_player_stop(info_hash, name=None, watched=None, added=False, initial_
         logging.info("Keeping %s: played again while asking", name)
         return
     if settings.stop_on_exit():
-        # Kept for later, but no downloading or seeding in the background
+        # Kept for later, but no downloading or seeding in the background, unless another of its
+        # files is still downloading: one asked for ahead (Ultra Player's next episode from a pack)
         try:
-            api.pause_torrent(info_hash)
+            ahead = [f.name for f in api.files(info_hash, status=True)
+                     if f.name != name and f.status.priority > 0 and f.status.progress < 100]
+            if ahead:
+                logging.info("Not pausing %s: still downloading %s", name, ", ".join(ahead))
+            else:
+                api.pause_torrent(info_hash)
         except TorrestError as e:
             logging.debug("Failed to pause %s: %s", info_hash, e)
 
@@ -442,6 +448,23 @@ def torrent_files(info_hash, folder=""):
         )
         file_li.addContextMenuItems(context_menu_items)
 
+        addDirectoryItem(plugin.handle, url, file_li)
+
+
+@plugin.route("/videos/<info_hash>")
+@check_directory
+def torrent_videos(info_hash):
+    """Every video file in a torrent, flat (no folders): label its path in the torrent, path
+    plays it (file_id is its index). For other add-ons (Ultra Player finds a pack's episodes)."""
+    wait_for_daemon()
+    files = [f for f in api.files(info_hash, status=False) if is_video(f.path)]
+    sort_items(files)
+    for f in files:
+        file_li = list_item(f.path, "download.png")
+        file_li.setInfo("video", {"title": f.name})
+        file_li.setProperty("IsPlayable", "true")
+        # Written out: url_for can't tell play_info_hash's decorated wrapper from the others
+        url = "plugin://{}/play_info_hash/{}?file_id={}".format(ADDON_ID, info_hash, f.id)
         addDirectoryItem(plugin.handle, url, file_li)
 
 
@@ -760,10 +783,12 @@ def play(info_hash, file_id):
 
     # The skin shows the download status in its own OSD: no overlay, publish it instead
     skin_osd = skin_osd_enabled()
+    # Publishes the ready range (and, with its setting, pauses while the download is behind)
     stream_watch = None
-    if settings.pause_when_behind() and is_video(name):
+    if is_video(name):
         stream_watch = StreamWatch(serve_url, file_info.length, settings.get_resume_ahead(),
-                                   progress_handler=lambda: api.file_status(info_hash, file_id).progress)
+                                   progress_handler=lambda: api.file_status(info_hash, file_id).progress,
+                                   pause=settings.pause_when_behind())
     try:
         with TorrestPlayer(
                 text_handler=(lambda: get_status_labels(info_hash) + (name,))

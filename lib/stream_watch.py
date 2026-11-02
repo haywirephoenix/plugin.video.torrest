@@ -13,7 +13,9 @@ the rest of the file is. The user's own play / pause wins: resumed by hand, it d
 until the download has caught up once.
 
 For the skin's progress line it publishes torrest.download.ready (0-100): the file's downloaded
-percent, or the percent of it known to be ready past the position, whichever is further.
+percent, or the percent of it known to be ready past the position, whichever is further. 100
+once the whole file is downloaded (Ultra Player then fetches the next episode). It runs for every
+video; with pause False (the setting off) it only reads ahead and publishes, never pausing.
 """
 
 import logging
@@ -36,10 +38,11 @@ CHECK_COMPLETE = 5  # seconds between checks whether the file has finished downl
 
 
 class StreamWatch(object):
-    def __init__(self, url, length, resume_ahead, progress_handler=None):
+    def __init__(self, url, length, resume_ahead, progress_handler=None, pause=True):
         self._url = url
         self._length = length
         self._resume_ahead = resume_ahead
+        self._pause = pause
         # Returns the file's downloaded percent (0-100)
         self._progress_handler = progress_handler
         self._progress = 0
@@ -107,7 +110,9 @@ class StreamWatch(object):
             waiting = self._waiting_since
         stalled = waiting is not None and time.time() - waiting >= STALL
         paused = player.is_paused()
-        if self._auto_paused:
+        if not self._pause:
+            pass
+        elif self._auto_paused:
             if not paused:
                 logging.info("Resumed by hand while the download is behind")
                 self._auto_paused, self._user_resumed = False, True
