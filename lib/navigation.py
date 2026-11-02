@@ -763,7 +763,7 @@ def play(info_hash, file_id):
     stream_watch = None
     if settings.pause_when_behind() and is_video(name):
         stream_watch = StreamWatch(serve_url, file_info.length, settings.get_resume_ahead(),
-                                   complete_handler=lambda: api.file_status(info_hash, file_id).progress >= 100)
+                                   progress_handler=lambda: api.file_status(info_hash, file_id).progress)
     try:
         with TorrestPlayer(
                 text_handler=(lambda: get_status_labels(info_hash) + (name,))

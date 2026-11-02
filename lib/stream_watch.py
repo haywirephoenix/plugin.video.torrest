@@ -11,6 +11,9 @@ seconds (what's already downloaded reads at once, so only a wait for peers count
 torrest.download.waiting, for the skin's OSD); it resumes once resume_ahead seconds are ready, or
 the rest of the file is. The user's own play / pause wins: resumed by hand, it doesn't pause again
 until the download has caught up once.
+
+For the skin's progress line it publishes torrest.download.ready (0-100): the file's downloaded
+percent, or the percent of it known to be ready past the position, whichever is further.
 """
 
 import logging
@@ -23,6 +26,7 @@ import xbmcgui
 from lib.kodi import WINDOW_HOME
 
 WAITING_PROPERTY = "torrest.download.waiting"
+READY_PROPERTY = "torrest.download.ready"
 PAUSE_AHEAD = 5  # seconds of video ready past the position, below which playback pauses
 STALL = 2  # ...once the reader has waited this long for data
 READ_AHEAD = 2  # the reader keeps this many times resume_ahead ready past the position
@@ -32,11 +36,13 @@ CHECK_COMPLETE = 5  # seconds between checks whether the file has finished downl
 
 
 class StreamWatch(object):
-    def __init__(self, url, length, resume_ahead, complete_handler=None):
+    def __init__(self, url, length, resume_ahead, progress_handler=None):
         self._url = url
         self._length = length
         self._resume_ahead = resume_ahead
-        self._complete_handler = complete_handler
+        # Returns the file's downloaded percent (0-100)
+        self._progress_handler = progress_handler
+        self._progress = 0
         self._complete = False
         self._rate = 0  # bytes per second of video
         self._offset = 0  # the play position's estimated byte offset
@@ -58,7 +64,9 @@ class StreamWatch(object):
     def stop(self):
         self._stopped.set()
         self._restart.set()
-        xbmcgui.Window(WINDOW_HOME).clearProperty(WAITING_PROPERTY)
+        home = xbmcgui.Window(WINDOW_HOME)
+        home.clearProperty(WAITING_PROPERTY)
+        home.clearProperty(READY_PROPERTY)
 
     def ahead(self):
         """Seconds of video ready past the play position (None when it's all there or unknown)."""
@@ -82,10 +90,11 @@ class StreamWatch(object):
     def check(self, player, period):
         """Called about every period seconds while the video plays or is paused."""
         self._since_check += period
-        if self._complete_handler and self._since_check >= CHECK_COMPLETE:
+        if self._progress_handler and self._since_check >= CHECK_COMPLETE:
             self._since_check = 0
             try:
-                self._complete = self._complete_handler()
+                self._progress = self._progress_handler()
+                self._complete = self._progress >= 100
             except Exception as e:
                 logging.debug("Failed to get the file status: %s", e)
         try:
@@ -118,6 +127,13 @@ class StreamWatch(object):
             home.setProperty(WAITING_PROPERTY, "1")
         else:
             home.clearProperty(WAITING_PROPERTY)
+        home.setProperty(READY_PROPERTY, str(self._ready_percent()))
+
+    def _ready_percent(self):
+        with self._lock:
+            if self._complete or self._length <= 0:
+                return 100
+            return int(max(self._progress, 100.0 * min(self._ready, self._length) / self._length))
 
     def _target(self):
         with self._lock:
