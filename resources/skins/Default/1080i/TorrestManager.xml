@@ -1,0 +1,389 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Torrest's torrent manager (lib/manager.py). 1920 x 1080. A skin can style it with its own
+     TorrestManager.xml: ids 100 (Add torrent/magnet), 200 (the list), and on each row the
+     properties size, progress (0-100), percent, status, up, down, seeds, peers and kind
+     (torrent, folder or file); window property error is set while the daemon doesn't answer. -->
+<window>
+    <defaultcontrol always="true">100</defaultcontrol>
+    <controls>
+        <control type="image">
+            <left>0</left>
+            <top>0</top>
+            <width>1920</width>
+            <height>1080</height>
+            <texture colordiffuse="FF121418">AddonWindow/white.png</texture>
+        </control>
+        <control type="label">
+            <left>60</left>
+            <top>36</top>
+            <width>1000</width>
+            <height>60</height>
+            <font>font13</font>
+            <textcolor>FFFFFFFF</textcolor>
+            <aligny>center</aligny>
+            <label>$ADDON[plugin.video.torrest 30206]</label>
+        </control>
+        <control type="button" id="100">
+            <left>60</left>
+            <top>110</top>
+            <width>420</width>
+            <height>70</height>
+            <font>font13</font>
+            <textcolor>FFC8CDD3</textcolor>
+            <focusedcolor>FFFFFFFF</focusedcolor>
+            <align>center</align>
+            <aligny>center</aligny>
+            <texturefocus colordiffuse="FF2D5C9E">AddonWindow/white.png</texturefocus>
+            <texturenofocus colordiffuse="FF1E2228">AddonWindow/white.png</texturenofocus>
+            <label>$ADDON[plugin.video.torrest 30207]</label>
+            <ondown>200</ondown>
+        </control>
+            <control type="label">
+                <left>80</left>
+                <top>200</top>
+                <width>620</width>
+                <height>50</height>
+                <font>font13</font>
+                <textcolor>FF8A929C</textcolor>
+                <align>left</align>
+                <aligny>center</aligny>
+                <label>$ADDON[plugin.video.torrest 30300]</label>
+            </control>
+            <control type="label">
+                <left>710</left>
+                <top>200</top>
+                <width>140</width>
+                <height>50</height>
+                <font>font13</font>
+                <textcolor>FF8A929C</textcolor>
+                <align>right</align>
+                <aligny>center</aligny>
+                <label>$ADDON[plugin.video.torrest 30301]</label>
+            </control>
+            <control type="label">
+                <left>880</left>
+                <top>200</top>
+                <width>260</width>
+                <height>50</height>
+                <font>font13</font>
+                <textcolor>FF8A929C</textcolor>
+                <align>center</align>
+                <aligny>center</aligny>
+                <label>$ADDON[plugin.video.torrest 30302]</label>
+            </control>
+            <control type="label">
+                <left>1160</left>
+                <top>200</top>
+                <width>230</width>
+                <height>50</height>
+                <font>font13</font>
+                <textcolor>FF8A929C</textcolor>
+                <align>left</align>
+                <aligny>center</aligny>
+                <label>$ADDON[plugin.video.torrest 30303]</label>
+            </control>
+            <control type="label">
+                <left>1400</left>
+                <top>200</top>
+                <width>130</width>
+                <height>50</height>
+                <font>font13</font>
+                <textcolor>FF8A929C</textcolor>
+                <align>right</align>
+                <aligny>center</aligny>
+                <label>$ADDON[plugin.video.torrest 30304]</label>
+            </control>
+            <control type="label">
+                <left>1540</left>
+                <top>200</top>
+                <width>130</width>
+                <height>50</height>
+                <font>font13</font>
+                <textcolor>FF8A929C</textcolor>
+                <align>right</align>
+                <aligny>center</aligny>
+                <label>$ADDON[plugin.video.torrest 30305]</label>
+            </control>
+            <control type="label">
+                <left>1680</left>
+                <top>200</top>
+                <width>80</width>
+                <height>50</height>
+                <font>font13</font>
+                <textcolor>FF8A929C</textcolor>
+                <align>right</align>
+                <aligny>center</aligny>
+                <label>$ADDON[plugin.video.torrest 30306]</label>
+            </control>
+            <control type="label">
+                <left>1770</left>
+                <top>200</top>
+                <width>80</width>
+                <height>50</height>
+                <font>font13</font>
+                <textcolor>FF8A929C</textcolor>
+                <align>right</align>
+                <aligny>center</aligny>
+                <label>$ADDON[plugin.video.torrest 30307]</label>
+            </control>
+        <control type="image">
+            <left>60</left>
+            <top>252</top>
+            <width>1800</width>
+            <height>2</height>
+            <texture colordiffuse="FF3A3F47">AddonWindow/white.png</texture>
+        </control>
+        <control type="list" id="200">
+            <left>60</left>
+            <top>264</top>
+            <width>1800</width>
+            <height>784</height>
+            <orientation>vertical</orientation>
+            <scrolltime tween="quadratic">200</scrolltime>
+            <onup>100</onup>
+            <itemlayout height="56" width="1800">
+                <control type="image">
+                    <left>0</left>
+                    <top>0</top>
+                    <width>1800</width>
+                    <height>52</height>
+                    <texture colordiffuse="FF1E2228">AddonWindow/white.png</texture>
+                </control>
+                <control type="label">
+                    <left>20</left>
+                    <top>0</top>
+                    <width>620</width>
+                    <height>56</height>
+                    <font>font13</font>
+                    <textcolor>FFFFFFFF</textcolor>
+                    <align>left</align>
+                    <aligny>center</aligny>
+                    <label>$INFO[ListItem.Label]</label>
+                </control>
+                <control type="label">
+                    <left>650</left>
+                    <top>0</top>
+                    <width>140</width>
+                    <height>56</height>
+                    <font>font13</font>
+                    <textcolor>FFC8CDD3</textcolor>
+                    <align>right</align>
+                    <aligny>center</aligny>
+                    <label>$INFO[ListItem.Property(size)]</label>
+                </control>
+                <control type="label">
+                    <left>980</left>
+                    <top>0</top>
+                    <width>100</width>
+                    <height>56</height>
+                    <font>font13</font>
+                    <textcolor>FFC8CDD3</textcolor>
+                    <align>right</align>
+                    <aligny>center</aligny>
+                    <label>$INFO[ListItem.Property(percent)]</label>
+                </control>
+                <control type="label">
+                    <left>1100</left>
+                    <top>0</top>
+                    <width>230</width>
+                    <height>56</height>
+                    <font>font13</font>
+                    <textcolor>FFC8CDD3</textcolor>
+                    <align>left</align>
+                    <aligny>center</aligny>
+                    <label>$INFO[ListItem.Property(status)]</label>
+                </control>
+                <control type="label">
+                    <left>1340</left>
+                    <top>0</top>
+                    <width>130</width>
+                    <height>56</height>
+                    <font>font13</font>
+                    <textcolor>FFC8CDD3</textcolor>
+                    <align>right</align>
+                    <aligny>center</aligny>
+                    <label>$INFO[ListItem.Property(up)]</label>
+                </control>
+                <control type="label">
+                    <left>1480</left>
+                    <top>0</top>
+                    <width>130</width>
+                    <height>56</height>
+                    <font>font13</font>
+                    <textcolor>FFC8CDD3</textcolor>
+                    <align>right</align>
+                    <aligny>center</aligny>
+                    <label>$INFO[ListItem.Property(down)]</label>
+                </control>
+                <control type="label">
+                    <left>1620</left>
+                    <top>0</top>
+                    <width>80</width>
+                    <height>56</height>
+                    <font>font13</font>
+                    <textcolor>FFC8CDD3</textcolor>
+                    <align>right</align>
+                    <aligny>center</aligny>
+                    <label>$INFO[ListItem.Property(seeds)]</label>
+                </control>
+                <control type="label">
+                    <left>1710</left>
+                    <top>0</top>
+                    <width>80</width>
+                    <height>56</height>
+                    <font>font13</font>
+                    <textcolor>FFC8CDD3</textcolor>
+                    <align>right</align>
+                    <aligny>center</aligny>
+                    <label>$INFO[ListItem.Property(peers)]</label>
+                </control>
+                <control type="progress">
+                    <left>820</left>
+                    <top>20</top>
+                    <width>150</width>
+                    <height>12</height>
+                    <texturebg colordiffuse="FF3A3F47">AddonWindow/white.png</texturebg>
+                    <midtexture colordiffuse="FF4CAF50">AddonWindow/white.png</midtexture>
+                    <info>ListItem.Property(progress)</info>
+                </control>
+            </itemlayout>
+            <focusedlayout height="56" width="1800">
+                <control type="image">
+                    <left>0</left>
+                    <top>0</top>
+                    <width>1800</width>
+                    <height>52</height>
+                    <texture colordiffuse="FF2D5C9E">AddonWindow/white.png</texture>
+                    <visible>Control.HasFocus(200)</visible>
+                </control>
+                <control type="image">
+                    <left>0</left>
+                    <top>0</top>
+                    <width>1800</width>
+                    <height>52</height>
+                    <texture colordiffuse="FF1E2228">AddonWindow/white.png</texture>
+                    <visible>!Control.HasFocus(200)</visible>
+                </control>
+                <control type="label">
+                    <left>20</left>
+                    <top>0</top>
+                    <width>620</width>
+                    <height>56</height>
+                    <font>font13</font>
+                    <textcolor>FFFFFFFF</textcolor>
+                    <align>left</align>
+                    <aligny>center</aligny>
+                    <label>$INFO[ListItem.Label]</label>
+                </control>
+                <control type="label">
+                    <left>650</left>
+                    <top>0</top>
+                    <width>140</width>
+                    <height>56</height>
+                    <font>font13</font>
+                    <textcolor>FFFFFFFF</textcolor>
+                    <align>right</align>
+                    <aligny>center</aligny>
+                    <label>$INFO[ListItem.Property(size)]</label>
+                </control>
+                <control type="label">
+                    <left>980</left>
+                    <top>0</top>
+                    <width>100</width>
+                    <height>56</height>
+                    <font>font13</font>
+                    <textcolor>FFFFFFFF</textcolor>
+                    <align>right</align>
+                    <aligny>center</aligny>
+                    <label>$INFO[ListItem.Property(percent)]</label>
+                </control>
+                <control type="label">
+                    <left>1100</left>
+                    <top>0</top>
+                    <width>230</width>
+                    <height>56</height>
+                    <font>font13</font>
+                    <textcolor>FFFFFFFF</textcolor>
+                    <align>left</align>
+                    <aligny>center</aligny>
+                    <label>$INFO[ListItem.Property(status)]</label>
+                </control>
+                <control type="label">
+                    <left>1340</left>
+                    <top>0</top>
+                    <width>130</width>
+                    <height>56</height>
+                    <font>font13</font>
+                    <textcolor>FFFFFFFF</textcolor>
+                    <align>right</align>
+                    <aligny>center</aligny>
+                    <label>$INFO[ListItem.Property(up)]</label>
+                </control>
+                <control type="label">
+                    <left>1480</left>
+                    <top>0</top>
+                    <width>130</width>
+                    <height>56</height>
+                    <font>font13</font>
+                    <textcolor>FFFFFFFF</textcolor>
+                    <align>right</align>
+                    <aligny>center</aligny>
+                    <label>$INFO[ListItem.Property(down)]</label>
+                </control>
+                <control type="label">
+                    <left>1620</left>
+                    <top>0</top>
+                    <width>80</width>
+                    <height>56</height>
+                    <font>font13</font>
+                    <textcolor>FFFFFFFF</textcolor>
+                    <align>right</align>
+                    <aligny>center</aligny>
+                    <label>$INFO[ListItem.Property(seeds)]</label>
+                </control>
+                <control type="label">
+                    <left>1710</left>
+                    <top>0</top>
+                    <width>80</width>
+                    <height>56</height>
+                    <font>font13</font>
+                    <textcolor>FFFFFFFF</textcolor>
+                    <align>right</align>
+                    <aligny>center</aligny>
+                    <label>$INFO[ListItem.Property(peers)]</label>
+                </control>
+                <control type="progress">
+                    <left>820</left>
+                    <top>20</top>
+                    <width>150</width>
+                    <height>12</height>
+                    <texturebg colordiffuse="FF3A3F47">AddonWindow/white.png</texturebg>
+                    <midtexture colordiffuse="FF4CAF50">AddonWindow/white.png</midtexture>
+                    <info>ListItem.Property(progress)</info>
+                </control>
+            </focusedlayout>
+        </control>
+        <control type="label">
+            <left>60</left>
+            <top>300</top>
+            <width>1800</width>
+            <height>60</height>
+            <font>font13</font>
+            <textcolor>FF8A929C</textcolor>
+            <align>center</align>
+            <label>$ADDON[plugin.video.torrest 30308]</label>
+            <visible>Integer.IsEqual(Container(200).NumItems,0) + String.IsEmpty(Window.Property(error))</visible>
+        </control>
+        <control type="label">
+            <left>60</left>
+            <top>300</top>
+            <width>1800</width>
+            <height>60</height>
+            <font>font13</font>
+            <textcolor>FFE57373</textcolor>
+            <align>center</align>
+            <label>$INFO[Window.Property(error)]</label>
+            <visible>!String.IsEmpty(Window.Property(error))</visible>
+        </control>
+    </controls>
+</window>

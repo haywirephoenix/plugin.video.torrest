@@ -140,10 +140,6 @@ def check_directory(func):
     return wrapper
 
 
-def li(tid, icon):
-    return list_item(translate(tid), icon)
-
-
 def list_item(label, icon):
     item = ListItem(label)
     item.setArt({"icon": os.path.join(ADDON_PATH, "resources", "images", icon)})
@@ -353,10 +349,20 @@ def remove_torrent_files(info_hash):
 
 
 @plugin.route("/")
-@check_directory
-def index():
-    addDirectoryItem(plugin.handle, plugin.url_for(torrents), li(30206, "torrents.png"), isFolder=True)
-    addDirectoryItem(plugin.handle, plugin.url_for(dialog_insert), li(30207, "add.png"), isFolder=False)
+@plugin.route("/manager")
+def torrent_manager():
+    """The torrent manager window (lib/manager.py): the torrents as a live table. A play from it
+    starts once it has closed."""
+    from lib.manager import TorrentManager  # it uses this module
+    if plugin.handle >= 0:
+        # Opened as a folder (ActivateWindow): Kodi would wait for a listing until the window closes
+        endOfDirectory(plugin.handle, succeeded=False)
+    window = TorrentManager("TorrestManager.xml", ADDON_PATH, "Default", "1080i")
+    window.doModal()
+    after = window.after
+    del window
+    if after:
+        executebuiltin(after)
 
 
 @plugin.route("/torrents")
