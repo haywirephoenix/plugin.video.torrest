@@ -150,8 +150,9 @@ class TorrentManager(WindowXML):
             ])
         elif row.kind == "folder":
             f = row.data
+            # A paused torrent's wanted files don't download: Download (which resumes it), not Stop
             entries.append((translate(30208), lambda: api.stop_torrent(info_hash, prefix=f.path))
-                           if f.status.wanted_count == f.file_count else
+                           if f.status.wanted_count == f.file_count and not row.paused else
                            (translate(30209), lambda: self._download(info_hash, prefix=f.path)))
         else:
             f = row.data
@@ -160,7 +161,7 @@ class TorrentManager(WindowXML):
                 entries.append((translate(30235), lambda: self._close_and_run(
                     nav.media(nav.buffer_and_play, info_hash=info_hash, file_id=f.id))))
             entries.append((translate(30209), lambda: self._download(info_hash, file_id=f.id))
-                           if f.status.priority == 0 else
+                           if f.status.priority == 0 or (row.paused and f.status.progress < 100) else
                            (translate(30208), lambda: api.stop_file(info_hash, f.id)))
 
         choice = Dialog().contextmenu([label for label, _ in entries])
@@ -268,8 +269,10 @@ class TorrentManager(WindowXML):
         d = row.data
         if row.kind == "torrent":
             status = d.status
+            # libtorrent stops updating a paused torrent's rates, so they'd stay at the last ones
             values = dict(size=sizeof_fmt(d.size), status=state_string(status),
-                          up=speed(status.upload_rate), down=speed(status.download_rate),
+                          up="" if status.paused else speed(status.upload_rate),
+                          down="" if status.paused else speed(status.download_rate),
                           seeds="{}/{}".format(status.seeders, status.seeders_total),
                           peers="{}/{}".format(status.peers, status.peers_total))
             progress = status.progress
