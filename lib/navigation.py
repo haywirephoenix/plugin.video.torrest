@@ -17,8 +17,8 @@ from xbmcplugin import addDirectoryItem, endOfDirectory, setResolvedUrl
 
 from lib import settings, trackers
 from lib.dialog import DialogInsert
-from lib.kodi import ADDON_DATA, ADDON_ID, ADDON_PATH, ADDON_NAME, translate, notification, set_logger, refresh, \
-    show_picture, busy_dialog, close_busy_dialog
+from lib.kodi import ADDON_DATA, ADDON_ICON, ADDON_ID, ADDON_PATH, ADDON_NAME, translate, notification, set_logger, \
+    refresh, show_picture, busy_dialog, close_busy_dialog, open_settings
 from lib.kodi_formats import is_music, is_picture, is_video, is_text
 from lib.play_status import PlayStatus, STATE_STARTING, STATE_BUFFERING, STATE_PLAYING, skin_osd_enabled
 from lib.player import TorrestPlayer, PlayerCancelledError
@@ -367,19 +367,23 @@ def remove_torrent_files(info_hash):
 
 
 @plugin.route("/")
+@check_directory
 def index():
-    """The add-on's root, opened as a folder (from Add-ons): no listing, the torrent manager instead.
-    The listing is cancelled, so Kodi stays where it was (it logs that as a failed listing): a
-    listing left open under the window would show an empty folder, and Kodi lists it again when
-    the window closes, which would open the manager again. The manager runs on its own, as
-    RunPlugin runs it (a RunPlugin has a handle too, so it can't tell the two apart)."""
-    endOfDirectory(plugin.handle, succeeded=False)
-    executebuiltin("RunPlugin({})".format(plugin.url_for(torrent_manager, from_root="true")))
+    # A listing for Kodi to come back to: the manager is a window over it, and Back from here
+    # returns to where the add-on was opened from
+    addDirectoryItem(plugin.handle, plugin.url_for(torrent_manager), list_item(translate(30206), "torrents.png"))
+    settings_li = ListItem(translate(30317))
+    settings_li.setArt({"icon": ADDON_ICON})
+    addDirectoryItem(plugin.handle, plugin.url_for(open_addon_settings), settings_li)
+
+
+@plugin.route("/settings")
+def open_addon_settings():
+    open_settings()
 
 
 @plugin.route("/manager")
-@query_arg("from_root", required=False, arg_type=Types.boolean)
-def torrent_manager(from_root=False):
+def torrent_manager():
     """The torrent manager window (lib/manager.py): the torrents as a live table. A play from it
     starts once it has closed. Run with RunPlugin (it lists nothing)."""
     from lib.manager import TorrentManager  # it uses this module
@@ -387,11 +391,6 @@ def torrent_manager(from_root=False):
     window.doModal()
     after = window.after
     del window
-    if from_root and getCondVisibility("Window.IsActive(videos)") and not getInfoLabel("Container.FolderPath"):
-        # Opening the add-on (its info dialog's Open: ActivateWindow(Videos, <root>, return)) left
-        # the Videos window at its own root, the root's listing being cancelled: leave it, back to
-        # where the add-on was opened from (Kodi closed the info dialog itself before opening it)
-        executebuiltin("Action(Back)")
     if after:
         executebuiltin(after)
 
