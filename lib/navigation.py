@@ -367,23 +367,25 @@ def remove_torrent_files(info_hash):
 
 
 @plugin.route("/")
+def index():
+    """The add-on's root, opened as a folder (from Add-ons): no listing, the torrent manager instead.
+    The listing is cancelled, so Kodi stays where it was (it logs that as a failed listing): a
+    listing left open under the window would show an empty folder, and Kodi lists it again when
+    the window closes, which would open the manager again. The manager runs on its own, as
+    RunPlugin runs it (a RunPlugin has a handle too, so it can't tell the two apart)."""
+    endOfDirectory(plugin.handle, succeeded=False)
+    executebuiltin("RunPlugin({})".format(plugin.url_for(torrent_manager)))
+
+
 @plugin.route("/manager")
 def torrent_manager():
     """The torrent manager window (lib/manager.py): the torrents as a live table. A play from it
-    starts once it has closed."""
+    starts once it has closed. Run with RunPlugin (it lists nothing)."""
     from lib.manager import TorrentManager  # it uses this module
-    folder = plugin.handle >= 0 and getInfoLabel("Container.FolderPath")
-    if plugin.handle >= 0:
-        # Opened as a folder (the add-on's root, ActivateWindow): an empty listing, as Kodi would
-        # wait for one until the window closes (and logs a failed one as an error); left below
-        endOfDirectory(plugin.handle, succeeded=True, updateListing=False, cacheToDisc=False)
     window = TorrentManager("TorrestManager.xml", ADDON_PATH, "Default", "1080i")
     window.doModal()
     after = window.after
     del window
-    if plugin.handle >= 0 and getInfoLabel("Container.FolderPath") != folder:
-        # Back out of the empty listing, to where the add-on was opened from
-        executebuiltin("Action(ParentDir)")
     if after:
         executebuiltin(after)
 
