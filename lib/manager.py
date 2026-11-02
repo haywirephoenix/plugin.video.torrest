@@ -118,8 +118,13 @@ class TorrentManager(WindowXML):
 
     def _open_file(self, row):
         f = row.data
-        if is_video(f.name) or is_music(f.name):
-            self._close_and_run(nav.media(nav.play, info_hash=row.info_hash, file_id=f.id))
+        if is_video(f.name) and settings.play_with_ultra_player():
+            self._close_and_run("RunPlugin({})".format(nav.ultra_player_url(row.info_hash, f.id, f.name)))
+        elif is_video(f.name):
+            # As any play: a paused torrent resumes, and it buffers (the skin's loading screen shows it)
+            self._close_and_run(nav.media(nav.play_info_hash, info_hash=row.info_hash, file_id=f.id))
+        elif is_music(f.name):
+            self._close_and_run(nav.media(nav.buffer_and_play, info_hash=row.info_hash, file_id=f.id))
         elif is_picture(f.name):
             nav.display_picture(row.info_hash, f.id)
         elif is_text(f.name):
@@ -135,7 +140,7 @@ class TorrentManager(WindowXML):
             if status.state not in (STATUS_SEEDING, STATUS_PAUSED):
                 entries.append((translate(30208), lambda: api.stop_torrent(info_hash))
                                if status.total == status.total_wanted else
-                               (translate(30209), lambda: api.download_torrent(info_hash)))
+                               (translate(30209), lambda: self._download(info_hash)))
             entries.extend([
                 (translate(30210), lambda: api.resume_torrent(info_hash))
                 if status.paused else
@@ -147,14 +152,14 @@ class TorrentManager(WindowXML):
             f = row.data
             entries.append((translate(30208), lambda: api.stop_torrent(info_hash, prefix=f.path))
                            if f.status.wanted_count == f.file_count else
-                           (translate(30209), lambda: api.download_torrent(info_hash, prefix=f.path)))
+                           (translate(30209), lambda: self._download(info_hash, prefix=f.path)))
         else:
             f = row.data
             if is_video(f.name) or is_music(f.name):
                 entries.append((translate(30309), lambda: self._open_file(row)))
                 entries.append((translate(30235), lambda: self._close_and_run(
                     nav.media(nav.buffer_and_play, info_hash=info_hash, file_id=f.id))))
-            entries.append((translate(30209), lambda: api.download_file(info_hash, f.id, buffer=False))
+            entries.append((translate(30209), lambda: self._download(info_hash, file_id=f.id))
                            if f.status.priority == 0 else
                            (translate(30208), lambda: api.stop_file(info_hash, f.id)))
 
@@ -167,6 +172,15 @@ class TorrentManager(WindowXML):
             logging.error("Torrent manager action failed: %s", e)
             notification(str(e))
         self._wake.set()
+
+    @staticmethod
+    def _download(info_hash, prefix="", file_id=None):
+        """Downloads a torrent, a folder of it or a file, resuming the torrent if it's paused."""
+        nav.resume_if_paused(info_hash)
+        if file_id is None:
+            nav.api.download_torrent(info_hash, prefix=prefix)
+        else:
+            nav.api.download_file(info_hash, file_id, buffer=False)
 
     # ------------------------------------------------------------ the table
 

@@ -811,3 +811,19 @@ msgstr ""
 msgctxt "#30312"
 msgid "The Torrest daemon isn't answering"
 msgstr ""
+
+msgctxt "#30313"
+msgid "Play files with"
+msgstr ""
+
+msgctxt "#30314"
+msgid "Torrest"
+msgstr ""
+
+msgctxt "#30315"
+msgid "Ultra Player"
+msgstr ""
+
+msgctxt "#30316"
+msgid "What plays a video file chosen in the torrent manager or a torrent's file list. Torrest: it buffers and plays the file itself. Ultra Player: Ultra Player plays it as the title it belongs to, with its loading screen and details, when it knows which one; otherwise it has Torrest play it."
+msgstr ""

@@ -25,7 +25,7 @@ from lib.player import TorrestPlayer, PlayerCancelledError
 from lib.prebuffer import PreBuffer
 from lib.stream_watch import StreamWatch
 from lib.torrest.api import Torrest, TorrestError, STATUS_SEEDING, STATUS_PAUSED, STATUS_QUEUED
-from lib.utils import sizeof_fmt, ThreadLocal
+from lib.utils import sizeof_fmt, ThreadLocal, assure_str
 
 set_logger()
 plugin = routing.Plugin()
@@ -38,6 +38,11 @@ queue_watch = None
 # The play's torrent, and whether this play added it (rather than playing one already there)
 play_torrent = None
 play_torrent_added = False
+
+# How Ultra Player plays a file of a torrent (the "Play files with" setting): it plays it as the
+# title it belongs to when it knows it, else through Torrest
+ULTRA_PLAYER_PLAY = ("plugin://plugin.video.ultra.player/play_torrent"
+                     "?info_hash={info_hash}&file_id={file_id}&name={name}")
 
 # Seconds a play's torrent may sit in libtorrent's queue before its magnet is re-added
 QUEUED_RECOVERY_DELAY = 8
@@ -276,6 +281,19 @@ def ask_to_delete(name, initial_delay, listing_timeout, message=30241):
     return Dialog().yesno(ADDON_NAME, name + "\n" + translate(message))
 
 
+def resume_if_paused(info_hash):
+    """Resumes a torrent that's paused (when an earlier play ended, or when Kodi started): a paused
+    torrent downloads nothing, and its serve URL answers 409. Returns its status."""
+    status = api.torrent_status(info_hash)
+    if status.paused:
+        api.resume_torrent(info_hash)
+    return status
+
+
+def ultra_player_url(info_hash, file_id, name):
+    return ULTRA_PLAYER_PLAY.format(info_hash=info_hash.lower(), file_id=file_id, name=quote(assure_str(name), safe=""))
+
+
 def wait_for_daemon():
     """Waits for the daemon to answer, up to the service timeout: it takes a while to start with
     Kodi (restoring its torrents), and a listing opened before then would fail."""
@@ -354,13 +372,18 @@ def torrent_manager():
     """The torrent manager window (lib/manager.py): the torrents as a live table. A play from it
     starts once it has closed."""
     from lib.manager import TorrentManager  # it uses this module
+    folder = plugin.handle >= 0 and getInfoLabel("Container.FolderPath")
     if plugin.handle >= 0:
-        # Opened as a folder (ActivateWindow): Kodi would wait for a listing until the window closes
-        endOfDirectory(plugin.handle, succeeded=False)
+        # Opened as a folder (the add-on's root, ActivateWindow): an empty listing, as Kodi would
+        # wait for one until the window closes (and logs a failed one as an error); left below
+        endOfDirectory(plugin.handle, succeeded=True, updateListing=False, cacheToDisc=False)
     window = TorrentManager("TorrestManager.xml", ADDON_PATH, "Default", "1080i")
     window.doModal()
     after = window.after
     del window
+    if plugin.handle >= 0 and getInfoLabel("Container.FolderPath") != folder:
+        # Back out of the empty listing, to where the add-on was opened from
+        executebuiltin("Action(ParentDir)")
     if after:
         executebuiltin(after)
 
@@ -403,6 +426,7 @@ def torrent_action(info_hash, action_str, prefix=""):
     if action_str == "stop":
         api.stop_torrent(info_hash, prefix=prefix)
     elif action_str == "download":
+        resume_if_paused(info_hash)
         api.download_torrent(info_hash, prefix=prefix)
     elif action_str == "pause":
         api.pause_torrent(info_hash)
@@ -496,7 +520,10 @@ def torrent_files(info_hash, folder=""):
             else:
                 info_type = None
 
-            if info_type is not None:
+            if info_type == "video" and settings.play_with_ultra_player():
+                url = plugin.url_for(play_with_ultra_player, info_hash, f.id)
+                file_li.setInfo(info_type, info_labels)
+            elif info_type is not None:
                 kwargs = dict(info_hash=info_hash, file_id=f.id)
                 url = plugin.url_for(play, **kwargs)
                 file_li.setInfo(info_type, info_labels)
@@ -657,10 +684,7 @@ def play_info_hash(info_hash, file_id=None, buffer=True):
     global play_torrent
     play_torrent = info_hash
     play_status.set_torrent(info_hash)
-    status = api.torrent_status(info_hash)
-    if status.paused:
-        # Stopped when an earlier play ended (or when Kodi started)
-        api.resume_torrent(info_hash)
+    status = resume_if_paused(info_hash)
     if not status.has_metadata:
         wait_for_metadata(info_hash)
 
@@ -762,6 +786,7 @@ def wait_for_metadata(info_hash):
 @plugin.route("/buffer_and_play/<info_hash>/<file_id>")
 @check_playable
 def buffer_and_play(info_hash, file_id):
+    resume_if_paused(info_hash)
     # The daemon's own buffering is skipped: PreBuffer reads the amounts set in the settings
     api.download_file(info_hash, file_id, buffer=False)
     wait_for_buffering_completion(info_hash, file_id)
@@ -819,6 +844,7 @@ def wait_for_buffering_completion(info_hash, file_id):
 @plugin.route("/play/<info_hash>/<file_id>")
 @check_playable
 def play(info_hash, file_id):
+    resume_if_paused(info_hash)
     serve_url = api.serve_url(info_hash, file_id)
     file_info = api.file_info(info_hash, file_id)
     name = file_info.name
@@ -882,9 +908,16 @@ def play(info_hash, file_id):
         status.clear()
 
 
+@plugin.route("/ultra_player/<info_hash>/<file_id>")
+def play_with_ultra_player(info_hash, file_id):
+    """A file listing's video, played by Ultra Player (the "Play files with" setting)."""
+    executebuiltin("RunPlugin({})".format(ultra_player_url(info_hash, file_id, api.file_info(info_hash, file_id).name)))
+
+
 @plugin.route("/torrents/<info_hash>/files/<file_id>/<action_str>")
 def file_action(info_hash, file_id, action_str):
     if action_str == "download":
+        resume_if_paused(info_hash)
         api.download_file(info_hash, file_id, buffer=False)
     elif action_str == "stop":
         api.stop_file(info_hash, file_id)

@@ -1,4 +1,8 @@
+from xbmc import getCondVisibility
+
 from lib.kodi import get_int_setting, get_boolean_setting, get_setting, set_boolean_setting
+
+ULTRA_PLAYER_ID = "plugin.video.ultra.player"
 
 
 class FilesOrder:
@@ -17,6 +21,11 @@ class PlaybackStopAction:
     ASK_TO_DELETE = 0
     DELETE = 1
     IGNORE = 2
+
+
+class PlayFilesWith:
+    TORREST = 0
+    ULTRA_PLAYER = 1
 
 
 class DeleteAction:
@@ -168,3 +177,10 @@ def set_has_libtorrest(value):
 
 def get_force_torrest():
     return get_boolean_setting("force_torrest")
+
+
+def play_with_ultra_player():
+    """Whether a file played from the manager or a file listing goes to Ultra Player (when it's
+    installed: else Torrest plays it)."""
+    return (get_int_setting("play_files_with") == PlayFilesWith.ULTRA_PLAYER
+            and getCondVisibility("System.HasAddon({})".format(ULTRA_PLAYER_ID)))
