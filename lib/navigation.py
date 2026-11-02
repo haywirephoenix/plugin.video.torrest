@@ -374,11 +374,12 @@ def index():
     the window closes, which would open the manager again. The manager runs on its own, as
     RunPlugin runs it (a RunPlugin has a handle too, so it can't tell the two apart)."""
     endOfDirectory(plugin.handle, succeeded=False)
-    executebuiltin("RunPlugin({})".format(plugin.url_for(torrent_manager)))
+    executebuiltin("RunPlugin({})".format(plugin.url_for(torrent_manager, from_root="true")))
 
 
 @plugin.route("/manager")
-def torrent_manager():
+@query_arg("from_root", required=False, arg_type=Types.boolean)
+def torrent_manager(from_root=False):
     """The torrent manager window (lib/manager.py): the torrents as a live table. A play from it
     starts once it has closed. Run with RunPlugin (it lists nothing)."""
     from lib.manager import TorrentManager  # it uses this module
@@ -386,6 +387,11 @@ def torrent_manager():
     window.doModal()
     after = window.after
     del window
+    if from_root and getCondVisibility("Window.IsActive(videos)") and not getInfoLabel("Container.FolderPath"):
+        # Opening the add-on (its info dialog's Open: ActivateWindow(Videos, <root>, return)) left
+        # the Videos window at its own root, the root's listing being cancelled: leave it, back to
+        # where the add-on was opened from (Kodi closed the info dialog itself before opening it)
+        executebuiltin("Action(Back)")
     if after:
         executebuiltin(after)
 
