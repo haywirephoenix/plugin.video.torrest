@@ -508,10 +508,12 @@ def play_magnet(magnet, file_id=None, index=None, buffer=True):
 @query_arg("magnet", arg_type=Types.string)
 @query_arg("file_id", required=False, arg_type=Types.integer)
 @query_arg("index", required=False, arg_type=Types.integer)
-def download_magnet(magnet, file_id=None, index=None):
+@query_arg("silent", required=False, arg_type=Types.boolean)
+def download_magnet(magnet, file_id=None, index=None, silent=False):
     """Downloads a magnet's torrent, or just one of its files (file_id / index), without playing
     it, as the Torrents menu's Download does: for other add-ons (Ultra Player's Download). It's
-    then in Torrents, where its progress shows; a later play of it streams what's there."""
+    then in Torrents, where its progress shows; a later play of it streams what's there. silent:
+    no "added" notification (Ultra Player's next episode, fetched ahead on its own)."""
     info_hash = api.add_magnet(with_trackers(magnet), ignore_duplicate=True, download=False)
     file_id = index if file_id is None else file_id
     if file_id is None:
@@ -524,7 +526,8 @@ def download_magnet(magnet, file_id=None, index=None):
                 notification(translate(30238))
                 return
         api.download_file(info_hash, file_id, buffer=False)
-    notification(translate(30243), time=2000)
+    if not silent:
+        notification(translate(30243), time=2000)
 
 
 def add_for_play(add):
