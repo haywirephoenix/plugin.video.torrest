@@ -41,23 +41,20 @@ def notification(message, heading=ADDON_NAME, icon=ADDON_ICON, time=5000, sound=
 
 def get_all_settings_spec():
     data = ElementTree.parse(os.path.join(ADDON_PATH, "resources", "settings.xml"))
-    for element in data.findall("*/setting"):
-        # Action buttons have no id (and no value)
-        if "id" in element.attrib:
+    for element in data.iter("setting"):
+        # Action buttons have no value
+        if element.get("type") != "action":
             yield dict(element.attrib)
 
 
 def get_setting_by_spec(spec):
+    # Setting types of the version 1 settings format
     t = spec["type"]
-    if t in ("number", "enum"):
+    if t == "integer":
         handle = get_int_setting
-    elif t == "slider":
-        # May be 'int', 'float' or 'percent'
-        if spec.get("option") == "int":
-            handle = get_int_setting
-        else:
-            handle = get_float_setting
-    elif t == "bool":
+    elif t == "number":
+        handle = get_float_setting
+    elif t == "boolean":
         handle = get_boolean_setting
     else:
         handle = get_setting

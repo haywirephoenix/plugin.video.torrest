@@ -81,6 +81,8 @@ class DaemonMonitor(xbmc.Monitor):
         s = kodi.generate_dict_settings(self._settings_spec, separator=self._settings_separator)[self._settings_prefix]
         s["download_path"] = assure_unicode(kodi.translatePath(s["download_path"]))
         s["torrents_path"] = assure_unicode(kodi.translatePath(s["torrents_path"]))
+        if not settings.limit_piece_wait():
+            s["piece_wait_timeout"] = 0  # the daemon waits for a piece without a limit
         return s
 
     def _get_daemon_settings(self):

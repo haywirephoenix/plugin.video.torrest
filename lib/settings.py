@@ -37,7 +37,8 @@ def get_daemon_timeout():
 
 
 def get_metadata_timeout():
-    return get_int_setting("metadata_timeout")
+    # 0 is no limit
+    return get_int_setting("metadata_timeout") if get_boolean_setting("limit_metadata_timeout") else 0
 
 
 def get_trackers_mode():
@@ -57,7 +58,12 @@ def get_buffer_end_size():
 
 
 def get_buffering_timeout():
-    return get_int_setting("buffer_timeout")
+    # 0 is no limit
+    return get_int_setting("buffer_timeout") if get_boolean_setting("limit_buffer_timeout") else 0
+
+
+def limit_piece_wait():
+    return get_boolean_setting("limit_piece_wait_timeout")
 
 
 def show_status_overlay():

@@ -1,105 +1,760 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<settings>
-    <category label="$INFO[System.AddonTitle(Window.Property(Addon.ID))]">
-        <setting id="has_libtorrest" type="bool" default="false" visible="false"/>
-        <setting id="service_enabled" type="bool" label="30059" default="true"/>
-        <setting id="timeout" type="number" label="30002" default="20" enable="eq(-1,true)" subsetting="true"/>
-        <setting id="force_torrest" type="bool" label="30085" default="false" subsetting="true" enable="eq(-2,true)" visible="eq(-3,true)"/>
-        <setting id="daemon_notification" type="bool" label="30110" default="false" subsetting="true" enable="eq(-3,true)"/>
-        <setting id="service_address" type="text" label="30060" default="127.0.0.1" enable="eq(-4,false)"/>
-        <setting id="port" type="number" label="30001" default="61235"/>
-        <setting id="ssl_connection" type="bool" label="30019" default="false"/>
-        <setting id="enable_folders" type="bool" label="30005" default="true"/>
-        <setting id="skip_root_folder" type="bool" label="30006" default="true" enable="eq(-1,true)" subsetting="true"/>
-        <setting id="files_order" type="enum" label="30064" default="0" lvalues="30065|30066|30067"/>
-        <setting id="overlay" type="bool" label="30004" default="true"/>
-        <setting id="metadata_timeout" type="slider" label="30081" option="int" range="0,10,120" default="30"/>
-        <setting id="buffer_start" type="slider" label="30094" option="int" range="5,5,200" default="15"/>
-        <setting id="buffer_end" type="slider" label="30095" option="int" range="0,1,20" default="5"/>
-        <setting id="buffer_timeout" type="slider" label="30003" option="int" range="0,30,600" default="300"/>
-        <setting id="min_candidate_size" type="slider" label="30055" option="int" range="0,10,200" default="100"/>
-        <setting id="on_playback_stop" type="enum" label="30086" default="0" lvalues="30087|30088|30089"/>
-        <setting id="delete_unstarted" type="bool" label="30096" default="true"/>
-        <setting id="unstarted_percent" type="slider" label="30097" option="int" range="0,1,50" default="5"
-                 enable="eq(-1,true)" subsetting="true"/>
-        <setting id="delete_watched" type="bool" label="30098" default="true"/>
-        <setting id="watched_percent" type="slider" label="30099" option="int" range="50,1,100" default="90"
-                 enable="eq(-1,true)" subsetting="true"/>
-        <!-- For the two rules above: delete straight away, or ask first -->
-        <setting id="delete_action" type="enum" label="30252" default="1" lvalues="30253|30254"/>
-        <setting id="stop_on_exit" type="bool" label="30107" default="true"/>
-        <setting id="stop_when_complete" type="bool" label="30108" default="true"/>
-        <setting id="stop_at_startup" type="bool" label="30109" default="true"/>
-        <setting id="show_bg_progress" type="bool" label="30068" default="true"/>
-        <setting id="download_after_insert" type="bool" label="30062" default="false"/>
-        <setting id="migrated" type="bool" visible="false" default="false"/>
-    </category>
-    <!-- Trackers -->
-    <category label="30111">
-        <setting id="trackers" type="enum" label="30090" default="0" lvalues="30091|30092|30093"/>
-        <setting label="30112" type="action" action="RunPlugin(plugin://plugin.video.torrest/trackers/enable)"/>
-        <setting label="30113" type="action" action="RunPlugin(plugin://plugin.video.torrest/trackers/add)"/>
-        <setting label="30114" type="action" action="RunPlugin(plugin://plugin.video.torrest/trackers/add_url)"/>
-        <setting label="30115" type="action" action="RunPlugin(plugin://plugin.video.torrest/trackers/remove)"/>
-        <setting label="30116" type="action" action="RunPlugin(plugin://plugin.video.torrest/trackers/reset)"/>
-        <setting id="tracker_max_failures" type="slider" label="30121" option="int" range="0,1,10" default="3"/>
-        <setting label="30123" type="action" action="RunPlugin(plugin://plugin.video.torrest/trackers/check)"/>
-    </category>
-    <!-- General -->
-    <category label="30000">
-        <setting id="s:download_path" type="folder" source="auto" option="writeable" label="30010"
-                 default="special://userdata/addon_data/plugin.video.torrest/downloads"/>
-        <setting id="s:torrents_path" type="folder" source="auto" option="writeable" label="30079"
-                 default="special://userdata/addon_data/plugin.video.torrest/torrents"/>
-        <setting id="s:buffer_size" type="number" label="30012" default="20971520"/>
-        <setting id="s:listen_port" type="number" label="30013" default="6889"/>
-        <setting id="s:listen_interfaces" type="text" label="30014" default=""/>
-        <setting id="s:outgoing_interfaces" type="text" label="30015" default=""/>
-        <setting id="s:user_agent" type="text" label="30018" default=""/>
-        <setting id="s:disable_dht" type="bool" label="30016" default="false"/>
-        <setting id="s:disable_upnp" type="bool" label="30017" default="false"/>
-        <setting id="s:disable_natpmp" type="bool" label="30069" default="false"/>
-        <setting id="s:disable_lsd" type="bool" label="30070" default="false"/>
-        <setting id="s:session_save" type="slider" label="30031" option="int" range="10,10,120" default="30"/>
-        <setting id="s:tuned_storage" type="bool" label="30032" default="false"/>
-        <setting id="s:check_available_space" type="bool" label="30080" default="true"/>
-        <!-- Encryption policy: Enabled | Disabled | Forced -->
-        <setting id="s:encryption_policy" type="enum" label="30039" lvalues="30040|30041|30042"/>
-        <setting id="s:service_log_level" type="enum" label="30057" values="TRACE|DEBUG|INFO|WARNING|ERROR|CRITICAL|OFF"
-                 default="2"/> <!-- default INFO -->
-        <setting id="s:alerts_log_level" type="enum" label="30058" values="TRACE|DEBUG|INFO|WARNING|ERROR|CRITICAL|OFF"
-                 default="5"/> <!-- default CRITICAL -->
-        <setting id="s:api_log_level" type="enum" label="30082" values="TRACE|DEBUG|INFO|WARNING|ERROR|CRITICAL|OFF"
-                 default="4"/> <!-- default ERROR -->
-    </category>
-    <!-- Limits -->
-    <category label="30078">
-        <setting id="s:connections_limit" type="number" label="30011" default="0"/>
-        <setting id="s:piece_wait_timeout" type="slider" label="30063" option="int" range="0,10,120" default="60"/>
-        <setting id="s:piece_expiration" type="slider" label="30084" option="int" range="5,5,120" default="5"/>
-        <setting id="s:limit_after_buffering" type="bool" label="30033" default="false"/>
-        <setting id="s:max_download_rate" type="number" label="30034" default="0"/>
-        <setting id="s:max_upload_rate" type="number" label="30035" default="0"/>
-        <setting id="s:share_ratio_limit" type="number" label="30036" default="0"/>
-        <setting id="s:seed_time_ratio_limit" type="number" label="30037" default="0"/>
-        <setting id="s:seed_time_limit" type="number" label="30038" default="0"/>
-        <setting id="s:active_downloads_limit" type="number" label="30071" default="3"/>
-        <setting id="s:active_seeds_limit" type="number" label="30072" default="5"/>
-        <setting id="s:active_checking_limit" type="number" label="30073" default="1"/>
-        <setting id="s:active_dht_limit" type="number" label="30074" default="88"/>
-        <setting id="s:active_tracker_limit" type="number" label="30075" default="1600"/>
-        <setting id="s:active_lsd_limit" type="number" label="30076" default="60"/>
-        <setting id="s:active_limit" type="number" label="30077" default="500"/>
-    </category>
-    <!-- Proxy -->
-    <category label="30043">
-        <!-- Proxy type: NONE | SOCKS4 | SOCKS5 | SOCKS5_PASSWORD | HTTP | HTTP_PASSWORD | I2PSAM -->
-        <setting id="s:proxy:type" type="enum" label="30044" default="0"
-                 lvalues="30061|30045|30046|30047|30048|30049|30050"/>
-        <setting id="s:proxy:hostname" type="text" label="30051" default="" enable="!eq(-1,0)" subsetting="true"/>
-        <setting id="s:proxy:port" type="number" label="30052" default="1080" enable="!eq(-2,0)" subsetting="true"/>
-        <setting id="s:proxy:username" type="text" label="30053" default="" enable="!eq(-3,0)" subsetting="true"/>
-        <setting id="s:proxy:password" type="text" label="30054" default="" option="hidden" enable="!eq(-4,0)"
-                 subsetting="true"/>
-    </category>
+<settings version="1">
+    <section id="plugin.video.torrest">
+        <!-- General -->
+        <category id="general" label="30000">
+            <group id="1">
+                <setting id="has_libtorrest" type="boolean">
+                    <level>0</level>
+                    <default>false</default>
+                    <visible>false</visible>
+                    <control type="toggle"/>
+                </setting>
+                <setting id="service_enabled" type="boolean" label="30059">
+                    <level>0</level>
+                    <default>true</default>
+                    <control type="toggle"/>
+                </setting>
+                <setting id="force_torrest" type="boolean" label="30085" parent="service_enabled">
+                    <level>0</level>
+                    <default>false</default>
+                    <dependencies>
+                        <dependency type="enable" setting="service_enabled">true</dependency>
+                        <dependency type="visible" setting="has_libtorrest">true</dependency>
+                    </dependencies>
+                    <control type="toggle"/>
+                </setting>
+                <setting id="daemon_notification" type="boolean" label="30110" parent="service_enabled">
+                    <level>0</level>
+                    <default>false</default>
+                    <dependencies>
+                        <dependency type="visible" setting="service_enabled">true</dependency>
+                    </dependencies>
+                    <control type="toggle"/>
+                </setting>
+                <setting id="service_address" type="string" label="30060">
+                    <level>0</level>
+                    <default>127.0.0.1</default>
+                    <constraints>
+                        <allowempty>true</allowempty>
+                    </constraints>
+                    <dependencies>
+                        <dependency type="visible" setting="service_enabled">false</dependency>
+                    </dependencies>
+                    <control type="edit" format="string">
+                        <heading>30060</heading>
+                    </control>
+                </setting>
+                <setting id="port" type="integer" label="30001">
+                    <level>0</level>
+                    <default>61235</default>
+                    <control type="edit" format="integer">
+                        <heading>30001</heading>
+                    </control>
+                </setting>
+                <setting id="ssl_connection" type="boolean" label="30019">
+                    <level>0</level>
+                    <default>false</default>
+                    <control type="toggle"/>
+                </setting>
+                <setting id="enable_folders" type="boolean" label="30005">
+                    <level>0</level>
+                    <default>true</default>
+                    <control type="toggle"/>
+                </setting>
+                <setting id="skip_root_folder" type="boolean" label="30006" parent="enable_folders">
+                    <level>0</level>
+                    <default>true</default>
+                    <dependencies>
+                        <dependency type="visible" setting="enable_folders">true</dependency>
+                    </dependencies>
+                    <control type="toggle"/>
+                </setting>
+                <setting id="files_order" type="integer" label="30064">
+                    <level>0</level>
+                    <default>0</default>
+                    <constraints>
+                        <options>
+                            <option label="30065">0</option>
+                            <option label="30066">1</option>
+                            <option label="30067">2</option>
+                        </options>
+                    </constraints>
+                    <control type="spinner" format="string"/>
+                </setting>
+                <setting id="download_after_insert" type="boolean" label="30062">
+                    <level>0</level>
+                    <default>false</default>
+                    <control type="toggle"/>
+                </setting>
+                <setting id="migrated" type="boolean">
+                    <level>0</level>
+                    <default>false</default>
+                    <visible>false</visible>
+                    <control type="toggle"/>
+                </setting>
+            </group>
+        </category>
+        <!-- Player -->
+        <category id="player" label="30255">
+            <group id="1">
+                <setting id="overlay" type="boolean" label="30004">
+                    <level>0</level>
+                    <default>true</default>
+                    <control type="toggle"/>
+                </setting>
+                <setting id="show_bg_progress" type="boolean" label="30068">
+                    <level>0</level>
+                    <default>true</default>
+                    <control type="toggle"/>
+                </setting>
+                <!-- The daemon's own buffering (download?buffer=true) uses it, but this add-on pre-buffers buffer_start / buffer_end itself (lib/prebuffer.py), so it's hidden -->
+                <setting id="s:buffer_size" type="integer" label="30012">
+                    <level>0</level>
+                    <default>20971520</default>
+                    <visible>false</visible>
+                    <control type="edit" format="integer">
+                        <heading>30012</heading>
+                    </control>
+                </setting>
+                <setting id="buffer_start" type="integer" label="30094">
+                    <level>0</level>
+                    <default>15</default>
+                    <constraints>
+                        <minimum>5</minimum>
+                        <step>5</step>
+                        <maximum>200</maximum>
+                    </constraints>
+                    <control type="slider" format="integer">
+                        <popup>false</popup>
+                    </control>
+                </setting>
+                <setting id="buffer_end" type="integer" label="30095">
+                    <level>0</level>
+                    <default>5</default>
+                    <constraints>
+                        <minimum>0</minimum>
+                        <step>1</step>
+                        <maximum>20</maximum>
+                    </constraints>
+                    <control type="slider" format="integer">
+                        <popup>false</popup>
+                    </control>
+                </setting>
+            </group>
+        </category>
+        <!-- Deletion -->
+        <category id="deletion" label="30256">
+            <group id="1">
+                <setting id="on_playback_stop" type="integer" label="30086">
+                    <level>0</level>
+                    <default>0</default>
+                    <constraints>
+                        <options>
+                            <option label="30087">0</option>
+                            <option label="30088">1</option>
+                            <option label="30089">2</option>
+                        </options>
+                    </constraints>
+                    <control type="spinner" format="string"/>
+                </setting>
+                <setting id="delete_unstarted" type="boolean" label="30096">
+                    <level>0</level>
+                    <default>true</default>
+                    <control type="toggle"/>
+                </setting>
+                <setting id="unstarted_percent" type="integer" label="30097" parent="delete_unstarted">
+                    <level>0</level>
+                    <default>5</default>
+                    <constraints>
+                        <minimum>0</minimum>
+                        <step>1</step>
+                        <maximum>50</maximum>
+                    </constraints>
+                    <dependencies>
+                        <dependency type="visible" setting="delete_unstarted">true</dependency>
+                    </dependencies>
+                    <control type="slider" format="integer">
+                        <popup>false</popup>
+                    </control>
+                </setting>
+                <setting id="delete_watched" type="boolean" label="30098">
+                    <level>0</level>
+                    <default>true</default>
+                    <control type="toggle"/>
+                </setting>
+                <setting id="watched_percent" type="integer" label="30099" parent="delete_watched">
+                    <level>0</level>
+                    <default>90</default>
+                    <constraints>
+                        <minimum>50</minimum>
+                        <step>1</step>
+                        <maximum>100</maximum>
+                    </constraints>
+                    <dependencies>
+                        <dependency type="visible" setting="delete_watched">true</dependency>
+                    </dependencies>
+                    <control type="slider" format="integer">
+                        <popup>false</popup>
+                    </control>
+                </setting>
+                <!-- For the two rules above: delete straight away, or ask first -->
+                <setting id="delete_action" type="integer" label="30252">
+                    <level>0</level>
+                    <default>1</default>
+                    <constraints>
+                        <options>
+                            <option label="30253">0</option>
+                            <option label="30254">1</option>
+                        </options>
+                    </constraints>
+                    <control type="spinner" format="string"/>
+                </setting>
+            </group>
+        </category>
+        <!-- Timeouts -->
+        <category id="timeouts" label="30257">
+            <group id="1">
+                <setting id="timeout" type="integer" label="30002" help="30270">
+                    <level>0</level>
+                    <default>20</default>
+                    <constraints>
+                        <minimum>20</minimum>
+                        <step>10</step>
+                        <maximum>500</maximum>
+                    </constraints>
+                    <dependencies>
+                        <dependency type="visible" setting="service_enabled">true</dependency>
+                    </dependencies>
+                    <control type="slider" format="integer">
+                        <popup>false</popup>
+                    </control>
+                </setting>
+                <!-- Each limit's toggle off means no limit (the timeout is 0 to the code) -->
+                <setting id="limit_buffer_timeout" type="boolean" label="30267" help="30275">
+                    <level>0</level>
+                    <default>true</default>
+                    <control type="toggle"/>
+                </setting>
+                <setting id="buffer_timeout" type="integer" label="30003" help="30271" parent="limit_buffer_timeout">
+                    <level>0</level>
+                    <default>300</default>
+                    <constraints>
+                        <minimum>0</minimum>
+                        <step>30</step>
+                        <maximum>600</maximum>
+                    </constraints>
+                    <dependencies>
+                        <dependency type="visible" setting="limit_buffer_timeout">true</dependency>
+                    </dependencies>
+                    <control type="slider" format="integer">
+                        <popup>false</popup>
+                    </control>
+                </setting>
+                <setting id="limit_metadata_timeout" type="boolean" label="30268" help="30276">
+                    <level>0</level>
+                    <default>true</default>
+                    <control type="toggle"/>
+                </setting>
+                <setting id="metadata_timeout" type="integer" label="30081" help="30272" parent="limit_metadata_timeout">
+                    <level>0</level>
+                    <default>30</default>
+                    <constraints>
+                        <minimum>0</minimum>
+                        <step>10</step>
+                        <maximum>120</maximum>
+                    </constraints>
+                    <dependencies>
+                        <dependency type="visible" setting="limit_metadata_timeout">true</dependency>
+                    </dependencies>
+                    <control type="slider" format="integer">
+                        <popup>false</popup>
+                    </control>
+                </setting>
+                <setting id="limit_piece_wait_timeout" type="boolean" label="30269" help="30277">
+                    <level>0</level>
+                    <default>true</default>
+                    <control type="toggle"/>
+                </setting>
+                <setting id="s:piece_wait_timeout" type="integer" label="30063" help="30273" parent="limit_piece_wait_timeout">
+                    <level>0</level>
+                    <default>60</default>
+                    <constraints>
+                        <minimum>0</minimum>
+                        <step>10</step>
+                        <maximum>120</maximum>
+                    </constraints>
+                    <dependencies>
+                        <dependency type="visible" setting="limit_piece_wait_timeout">true</dependency>
+                    </dependencies>
+                    <control type="slider" format="integer">
+                        <popup>false</popup>
+                    </control>
+                </setting>
+                <setting id="s:piece_expiration" type="integer" label="30084" help="30274">
+                    <level>0</level>
+                    <default>5</default>
+                    <constraints>
+                        <minimum>5</minimum>
+                        <step>5</step>
+                        <maximum>120</maximum>
+                    </constraints>
+                    <control type="slider" format="integer">
+                        <popup>false</popup>
+                    </control>
+                </setting>
+            </group>
+        </category>
+        <!-- Trackers -->
+        <category id="trackers" label="30111">
+            <group id="1">
+                <setting id="trackers" type="integer" label="30090">
+                    <level>0</level>
+                    <default>0</default>
+                    <constraints>
+                        <options>
+                            <option label="30091">0</option>
+                            <option label="30092">1</option>
+                            <option label="30093">2</option>
+                        </options>
+                    </constraints>
+                    <control type="spinner" format="string"/>
+                </setting>
+                <setting id="trackers_enable" type="action" label="30112">
+                    <level>0</level>
+                    <constraints>
+                        <allowempty>true</allowempty>
+                    </constraints>
+                    <data>RunPlugin(plugin://plugin.video.torrest/trackers/enable)</data>
+                    <control type="button" format="action"/>
+                </setting>
+                <setting id="trackers_add" type="action" label="30113">
+                    <level>0</level>
+                    <constraints>
+                        <allowempty>true</allowempty>
+                    </constraints>
+                    <data>RunPlugin(plugin://plugin.video.torrest/trackers/add)</data>
+                    <control type="button" format="action"/>
+                </setting>
+                <setting id="trackers_add_url" type="action" label="30114">
+                    <level>0</level>
+                    <constraints>
+                        <allowempty>true</allowempty>
+                    </constraints>
+                    <data>RunPlugin(plugin://plugin.video.torrest/trackers/add_url)</data>
+                    <control type="button" format="action"/>
+                </setting>
+                <setting id="trackers_remove" type="action" label="30115">
+                    <level>0</level>
+                    <constraints>
+                        <allowempty>true</allowempty>
+                    </constraints>
+                    <data>RunPlugin(plugin://plugin.video.torrest/trackers/remove)</data>
+                    <control type="button" format="action"/>
+                </setting>
+                <setting id="trackers_reset" type="action" label="30116">
+                    <level>0</level>
+                    <constraints>
+                        <allowempty>true</allowempty>
+                    </constraints>
+                    <data>RunPlugin(plugin://plugin.video.torrest/trackers/reset)</data>
+                    <control type="button" format="action"/>
+                </setting>
+                <setting id="tracker_max_failures" type="integer" label="30121">
+                    <level>0</level>
+                    <default>3</default>
+                    <constraints>
+                        <minimum>0</minimum>
+                        <step>1</step>
+                        <maximum>10</maximum>
+                    </constraints>
+                    <control type="slider" format="integer">
+                        <popup>false</popup>
+                    </control>
+                </setting>
+                <setting id="trackers_check" type="action" label="30123">
+                    <level>0</level>
+                    <constraints>
+                        <allowempty>true</allowempty>
+                    </constraints>
+                    <data>RunPlugin(plugin://plugin.video.torrest/trackers/check)</data>
+                    <control type="button" format="action"/>
+                </setting>
+            </group>
+        </category>
+        <!-- Torrent -->
+        <category id="torrent" label="30258">
+            <group id="1">
+                <setting id="stop_on_exit" type="boolean" label="30107">
+                    <level>0</level>
+                    <default>true</default>
+                    <control type="toggle"/>
+                </setting>
+                <setting id="stop_when_complete" type="boolean" label="30108">
+                    <level>0</level>
+                    <default>true</default>
+                    <control type="toggle"/>
+                </setting>
+                <setting id="stop_at_startup" type="boolean" label="30109">
+                    <level>0</level>
+                    <default>true</default>
+                    <control type="toggle"/>
+                </setting>
+                <setting id="s:download_path" type="path" label="30010">
+                    <level>0</level>
+                    <default>special://userdata/addon_data/plugin.video.torrest/downloads</default>
+                    <constraints>
+                        <writable>true</writable>
+                    </constraints>
+                    <control type="button" format="path">
+                        <heading>30010</heading>
+                    </control>
+                </setting>
+                <setting id="s:torrents_path" type="path" label="30079">
+                    <level>0</level>
+                    <default>special://userdata/addon_data/plugin.video.torrest/torrents</default>
+                    <constraints>
+                        <writable>true</writable>
+                    </constraints>
+                    <control type="button" format="path">
+                        <heading>30079</heading>
+                    </control>
+                </setting>
+                <setting id="s:listen_port" type="integer" label="30013">
+                    <level>0</level>
+                    <default>6889</default>
+                    <control type="edit" format="integer">
+                        <heading>30013</heading>
+                    </control>
+                </setting>
+                <setting id="s:listen_interfaces" type="string" label="30014">
+                    <level>0</level>
+                    <default/>
+                    <constraints>
+                        <allowempty>true</allowempty>
+                    </constraints>
+                    <control type="edit" format="string">
+                        <heading>30014</heading>
+                    </control>
+                </setting>
+                <setting id="s:outgoing_interfaces" type="string" label="30015">
+                    <level>0</level>
+                    <default/>
+                    <constraints>
+                        <allowempty>true</allowempty>
+                    </constraints>
+                    <control type="edit" format="string">
+                        <heading>30015</heading>
+                    </control>
+                </setting>
+                <setting id="s:user_agent" type="string" label="30018">
+                    <level>0</level>
+                    <default/>
+                    <constraints>
+                        <allowempty>true</allowempty>
+                    </constraints>
+                    <control type="edit" format="string">
+                        <heading>30018</heading>
+                    </control>
+                </setting>
+                <!-- Encryption policy: Enabled | Disabled | Forced -->
+                <setting id="s:encryption_policy" type="integer" label="30039">
+                    <level>0</level>
+                    <default>0</default>
+                    <constraints>
+                        <options>
+                            <option label="30040">0</option>
+                            <option label="30041">1</option>
+                            <option label="30042">2</option>
+                        </options>
+                    </constraints>
+                    <control type="spinner" format="string"/>
+                </setting>
+                <!-- Proxy type: NONE | SOCKS4 | SOCKS5 | SOCKS5_PASSWORD | HTTP | HTTP_PASSWORD | I2PSAM -->
+                <setting id="s:proxy:type" type="integer" label="30044">
+                    <level>0</level>
+                    <default>0</default>
+                    <constraints>
+                        <options>
+                            <option label="30061">0</option>
+                            <option label="30045">1</option>
+                            <option label="30046">2</option>
+                            <option label="30047">3</option>
+                            <option label="30048">4</option>
+                            <option label="30049">5</option>
+                            <option label="30050">6</option>
+                        </options>
+                    </constraints>
+                    <control type="spinner" format="string"/>
+                </setting>
+                <setting id="s:proxy:hostname" type="string" label="30051" parent="s:proxy:type">
+                    <level>0</level>
+                    <default/>
+                    <constraints>
+                        <allowempty>true</allowempty>
+                    </constraints>
+                    <dependencies>
+                        <dependency type="visible">
+                            <condition operator="!is" setting="s:proxy:type">0</condition>
+                        </dependency>
+                    </dependencies>
+                    <control type="edit" format="string">
+                        <heading>30051</heading>
+                    </control>
+                </setting>
+                <setting id="s:proxy:port" type="integer" label="30052" parent="s:proxy:type">
+                    <level>0</level>
+                    <default>1080</default>
+                    <dependencies>
+                        <dependency type="visible">
+                            <condition operator="!is" setting="s:proxy:type">0</condition>
+                        </dependency>
+                    </dependencies>
+                    <control type="edit" format="integer">
+                        <heading>30052</heading>
+                    </control>
+                </setting>
+                <setting id="s:proxy:username" type="string" label="30053" parent="s:proxy:type">
+                    <level>0</level>
+                    <default/>
+                    <constraints>
+                        <allowempty>true</allowempty>
+                    </constraints>
+                    <dependencies>
+                        <dependency type="visible">
+                            <condition operator="!is" setting="s:proxy:type">0</condition>
+                        </dependency>
+                    </dependencies>
+                    <control type="edit" format="string">
+                        <heading>30053</heading>
+                    </control>
+                </setting>
+                <setting id="s:proxy:password" type="string" label="30054" parent="s:proxy:type">
+                    <level>0</level>
+                    <default/>
+                    <constraints>
+                        <allowempty>true</allowempty>
+                    </constraints>
+                    <dependencies>
+                        <dependency type="visible">
+                            <condition operator="!is" setting="s:proxy:type">0</condition>
+                        </dependency>
+                    </dependencies>
+                    <control type="edit" format="string">
+                        <heading>30054</heading>
+                        <hidden>true</hidden>
+                    </control>
+                </setting>
+                <setting id="s:disable_dht" type="boolean" label="30016">
+                    <level>0</level>
+                    <default>false</default>
+                    <control type="toggle"/>
+                </setting>
+                <setting id="s:disable_upnp" type="boolean" label="30017">
+                    <level>0</level>
+                    <default>false</default>
+                    <control type="toggle"/>
+                </setting>
+                <setting id="s:disable_natpmp" type="boolean" label="30069">
+                    <level>0</level>
+                    <default>false</default>
+                    <control type="toggle"/>
+                </setting>
+                <setting id="s:disable_lsd" type="boolean" label="30070">
+                    <level>0</level>
+                    <default>false</default>
+                    <control type="toggle"/>
+                </setting>
+                <setting id="s:session_save" type="integer" label="30031">
+                    <level>0</level>
+                    <default>30</default>
+                    <constraints>
+                        <minimum>10</minimum>
+                        <step>10</step>
+                        <maximum>120</maximum>
+                    </constraints>
+                    <control type="slider" format="integer">
+                        <popup>false</popup>
+                    </control>
+                </setting>
+                <setting id="s:tuned_storage" type="boolean" label="30032">
+                    <level>0</level>
+                    <default>false</default>
+                    <control type="toggle"/>
+                </setting>
+                <setting id="s:check_available_space" type="boolean" label="30080">
+                    <level>0</level>
+                    <default>true</default>
+                    <control type="toggle"/>
+                </setting>
+            </group>
+        </category>
+        <!-- Limits -->
+        <category id="limits" label="30078">
+            <group id="1">
+                <setting id="min_candidate_size" type="integer" label="30055">
+                    <level>0</level>
+                    <default>100</default>
+                    <constraints>
+                        <minimum>0</minimum>
+                        <step>10</step>
+                        <maximum>200</maximum>
+                    </constraints>
+                    <control type="slider" format="integer">
+                        <popup>false</popup>
+                    </control>
+                </setting>
+                <setting id="s:connections_limit" type="integer" label="30011">
+                    <level>0</level>
+                    <default>0</default>
+                    <control type="edit" format="integer">
+                        <heading>30011</heading>
+                    </control>
+                </setting>
+                <setting id="s:limit_after_buffering" type="boolean" label="30033">
+                    <level>0</level>
+                    <default>false</default>
+                    <control type="toggle"/>
+                </setting>
+                <setting id="s:max_download_rate" type="integer" label="30034">
+                    <level>0</level>
+                    <default>0</default>
+                    <control type="edit" format="integer">
+                        <heading>30034</heading>
+                    </control>
+                </setting>
+                <setting id="s:max_upload_rate" type="integer" label="30035">
+                    <level>0</level>
+                    <default>0</default>
+                    <control type="edit" format="integer">
+                        <heading>30035</heading>
+                    </control>
+                </setting>
+                <setting id="s:share_ratio_limit" type="integer" label="30036">
+                    <level>0</level>
+                    <default>0</default>
+                    <control type="edit" format="integer">
+                        <heading>30036</heading>
+                    </control>
+                </setting>
+                <setting id="s:seed_time_ratio_limit" type="integer" label="30037">
+                    <level>0</level>
+                    <default>0</default>
+                    <control type="edit" format="integer">
+                        <heading>30037</heading>
+                    </control>
+                </setting>
+                <setting id="s:seed_time_limit" type="integer" label="30038">
+                    <level>0</level>
+                    <default>0</default>
+                    <control type="edit" format="integer">
+                        <heading>30038</heading>
+                    </control>
+                </setting>
+                <setting id="s:active_downloads_limit" type="integer" label="30071">
+                    <level>0</level>
+                    <default>3</default>
+                    <control type="edit" format="integer">
+                        <heading>30071</heading>
+                    </control>
+                </setting>
+                <setting id="s:active_seeds_limit" type="integer" label="30072">
+                    <level>0</level>
+                    <default>5</default>
+                    <control type="edit" format="integer">
+                        <heading>30072</heading>
+                    </control>
+                </setting>
+                <setting id="s:active_checking_limit" type="integer" label="30073">
+                    <level>0</level>
+                    <default>1</default>
+                    <control type="edit" format="integer">
+                        <heading>30073</heading>
+                    </control>
+                </setting>
+                <setting id="s:active_dht_limit" type="integer" label="30074">
+                    <level>0</level>
+                    <default>88</default>
+                    <control type="edit" format="integer">
+                        <heading>30074</heading>
+                    </control>
+                </setting>
+                <setting id="s:active_tracker_limit" type="integer" label="30075">
+                    <level>0</level>
+                    <default>1600</default>
+                    <control type="edit" format="integer">
+                        <heading>30075</heading>
+                    </control>
+                </setting>
+                <setting id="s:active_lsd_limit" type="integer" label="30076">
+                    <level>0</level>
+                    <default>60</default>
+                    <control type="edit" format="integer">
+                        <heading>30076</heading>
+                    </control>
+                </setting>
+                <setting id="s:active_limit" type="integer" label="30077">
+                    <level>0</level>
+                    <default>500</default>
+                    <control type="edit" format="integer">
+                        <heading>30077</heading>
+                    </control>
+                </setting>
+            </group>
+        </category>
+        <!-- Logging -->
+        <category id="logging" label="30259">
+            <group id="1">
+                <!-- Log levels: TRACE | DEBUG | INFO | WARNING | ERROR | CRITICAL | OFF -->
+                <setting id="s:service_log_level" type="integer" label="30057">
+                    <level>0</level>
+                    <default>2</default>
+                    <constraints>
+                        <options>
+                            <option label="30260">0</option>
+                            <option label="30261">1</option>
+                            <option label="30262">2</option>
+                            <option label="30263">3</option>
+                            <option label="30264">4</option>
+                            <option label="30265">5</option>
+                            <option label="30266">6</option>
+                        </options>
+                    </constraints>
+                    <control type="spinner" format="string"/>
+                </setting>
+                <setting id="s:alerts_log_level" type="integer" label="30058">
+                    <level>0</level>
+                    <default>5</default>
+                    <constraints>
+                        <options>
+                            <option label="30260">0</option>
+                            <option label="30261">1</option>
+                            <option label="30262">2</option>
+                            <option label="30263">3</option>
+                            <option label="30264">4</option>
+                            <option label="30265">5</option>
+                            <option label="30266">6</option>
+                        </options>
+                    </constraints>
+                    <control type="spinner" format="string"/>
+                </setting>
+                <setting id="s:api_log_level" type="integer" label="30082">
+                    <level>0</level>
+                    <default>4</default>
+                    <constraints>
+                        <options>
+                            <option label="30260">0</option>
+                            <option label="30261">1</option>
+                            <option label="30262">2</option>
+                            <option label="30263">3</option>
+                            <option label="30264">4</option>
+                            <option label="30265">5</option>
+                            <option label="30266">6</option>
+                        </options>
+                    </constraints>
+                    <control type="spinner" format="string"/>
+                </setting>
+            </group>
+        </category>
+    </section>
 </settings>

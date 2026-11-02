@@ -631,3 +631,95 @@ msgstr ""
 msgctxt "#30254"
 msgid "Ask"
 msgstr ""
+
+msgctxt "#30255"
+msgid "Player"
+msgstr ""
+
+msgctxt "#30256"
+msgid "Deletion"
+msgstr ""
+
+msgctxt "#30257"
+msgid "Timeouts"
+msgstr ""
+
+msgctxt "#30258"
+msgid "Torrent"
+msgstr ""
+
+msgctxt "#30259"
+msgid "Logging"
+msgstr ""
+
+msgctxt "#30260"
+msgid "Trace"
+msgstr ""
+
+msgctxt "#30261"
+msgid "Debug"
+msgstr ""
+
+msgctxt "#30262"
+msgid "Info"
+msgstr ""
+
+msgctxt "#30263"
+msgid "Warning"
+msgstr ""
+
+msgctxt "#30264"
+msgid "Error"
+msgstr ""
+
+msgctxt "#30265"
+msgid "Critical"
+msgstr ""
+
+msgctxt "#30266"
+msgid "Off"
+msgstr ""
+
+msgctxt "#30267"
+msgid "Limit buffering time"
+msgstr ""
+
+msgctxt "#30268"
+msgid "Limit metadata wait"
+msgstr ""
+
+msgctxt "#30269"
+msgid "Limit piece wait"
+msgstr ""
+
+msgctxt "#30270"
+msgid "Seconds to wait for the Torrest daemon to answer after it starts (with Kodi, after a settings change or a crash). Torrent lists opened meanwhile wait as long. Raise it if the daemon is slow to start here (many torrents to restore, a slow device) and the log says \"Timed out waiting for daemon\"; lower it to give up sooner when it can't start."
+msgstr ""
+
+msgctxt "#30271"
+msgid "Seconds a play waits for pre-buffering (Buffer start and Buffer end) before it gives up. Raise it for slow or poorly seeded torrents that would get there with more time; lower it to fail sooner on dead ones. 0 also means no limit."
+msgstr ""
+
+msgctxt "#30272"
+msgid "Seconds a play (or a file download) waits for a magnet's metadata, its file list fetched from peers, before it gives up. Raise it for rare magnets with few peers; lower it to fail sooner on dead ones. 0 also means no limit."
+msgstr ""
+
+msgctxt "#30273"
+msgid "Daemon setting: seconds a read from the stream waits for a missing piece before it fails. Raise it if a slow torrent's playback stops with read errors; lower it so a stalled stream fails sooner instead of hanging. 0 also means no limit."
+msgstr ""
+
+msgctxt "#30274"
+msgid "Daemon setting: seconds a piece that is no longer read stays in memory. Higher keeps more in memory, so seeking back is quicker but uses more memory; lower frees memory sooner. It isn't a timeout that fails anything, so it can't be turned off."
+msgstr ""
+
+msgctxt "#30275"
+msgid "Give up a play when buffering takes longer than the time below. Off: buffering goes on until it completes or you cancel it."
+msgstr ""
+
+msgctxt "#30276"
+msgid "Give up a play when a magnet's metadata takes longer than the time below to arrive. Off: it waits until the metadata arrives or you cancel it."
+msgstr ""
+
+msgctxt "#30277"
+msgid "Let the daemon give up on a missing piece after the time below. Off: a read waits until the piece arrives, which can leave the player hanging on a stalled torrent."
+msgstr ""
