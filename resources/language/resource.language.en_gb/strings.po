@@ -723,3 +723,19 @@ msgstr ""
 msgctxt "#30277"
 msgid "Let the daemon give up on a missing piece after the time below. Off: a read waits until the piece arrives, which can leave the player hanging on a stalled torrent."
 msgstr ""
+
+msgctxt "#30278"
+msgid "Pause when the download falls behind"
+msgstr ""
+
+msgctxt "#30279"
+msgid "Resume once ahead by (seconds)"
+msgstr ""
+
+msgctxt "#30280"
+msgid "While a video plays, Torrest fetches the part just ahead of it first. When less than a few seconds of it are downloaded, the video pauses rather than running into the missing part (which can stop the player), and carries on by itself once the time below is ready. Off: playback runs on and may stall or stop on a slow torrent."
+msgstr ""
+
+msgctxt "#30281"
+msgid "Seconds of video that must be downloaded past the play position before a paused video carries on. Higher pauses less often but for longer; lower carries on sooner but may pause again soon on a slow torrent."
+msgstr ""

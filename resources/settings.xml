@@ -141,6 +141,27 @@
                         <popup>false</popup>
                     </control>
                 </setting>
+                <!-- While a video plays (lib/stream_watch.py) -->
+                <setting id="pause_when_behind" type="boolean" label="30278" help="30280">
+                    <level>0</level>
+                    <default>true</default>
+                    <control type="toggle"/>
+                </setting>
+                <setting id="resume_ahead" type="integer" label="30279" help="30281" parent="pause_when_behind">
+                    <level>0</level>
+                    <default>30</default>
+                    <constraints>
+                        <minimum>10</minimum>
+                        <step>5</step>
+                        <maximum>300</maximum>
+                    </constraints>
+                    <control type="slider" format="integer">
+                        <popup>false</popup>
+                    </control>
+                    <dependencies>
+                        <dependency type="visible" setting="pause_when_behind">true</dependency>
+                    </dependencies>
+                </setting>
             </group>
         </category>
         <!-- Deletion -->

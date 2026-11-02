@@ -104,6 +104,15 @@ class Player(object):
     def get_playing_file(self):
         return self._player.getPlayingFile()
 
+    def get_time(self):
+        return self._player.getTime()
+
+    def get_total_time(self):
+        return self._player.getTotalTime()
+
+    def toggle_pause(self):
+        self._player.pause()
+
     def is_active(self):
         return self._player.isPlaying()
 
@@ -133,8 +142,11 @@ class Player(object):
 
 class TorrestPlayer(Player):
     def __init__(self, text_handler=None, on_start_handler=None, on_close_handler=None, download_status_handler=None,
-                 active_handler=None, cancel_handler=None):
+                 active_handler=None, cancel_handler=None, stream_watch=None):
         super(TorrestPlayer, self).__init__()
+        # Pauses while the download is behind playback (see lib/stream_watch.py)
+        self._stream_watch = stream_watch
+        self._watch_thread = None
         self._active_handler = active_handler
         self._cancel_handler = cancel_handler
         self._stopped = False
@@ -165,6 +177,11 @@ class TorrestPlayer(Player):
             self._download_thread = threading.Thread(target=self._download_publisher)
             self._download_thread.daemon = True
             self._download_thread.start()
+        if self._stream_watch:
+            self._stream_watch.start()
+            self._watch_thread = threading.Thread(target=self._stream_watcher)
+            self._watch_thread.daemon = True
+            self._watch_thread.start()
 
     def on_playback_paused(self):
         if self._overlay:
@@ -211,6 +228,18 @@ class TorrestPlayer(Player):
         finally:
             clear_download()
 
+    def _stream_watcher(self):
+        try:
+            while not self._stopped and self.is_active():
+                try:
+                    self._stream_watch.check(self, 1)
+                except Exception as e:
+                    logging.error("Stream watch failed: %s", e, exc_info=True)
+                if self._monitor.waitForAbort(1):
+                    break
+        finally:
+            self._stream_watch.stop()
+
     def __enter__(self):
         return self
 
@@ -221,4 +250,6 @@ class TorrestPlayer(Player):
             self._overlay.close()
         if self._download_thread:
             self._download_thread.join()
+        if self._watch_thread:
+            self._watch_thread.join()
         return False

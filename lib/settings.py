@@ -62,6 +62,14 @@ def get_buffering_timeout():
     return get_int_setting("buffer_timeout") if get_boolean_setting("limit_buffer_timeout") else 0
 
 
+def pause_when_behind():
+    return get_boolean_setting("pause_when_behind")
+
+
+def get_resume_ahead():
+    return get_int_setting("resume_ahead")
+
+
 def limit_piece_wait():
     return get_boolean_setting("limit_piece_wait_timeout")
 

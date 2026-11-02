@@ -22,6 +22,7 @@ from lib.kodi_formats import is_music, is_picture, is_video, is_text
 from lib.play_status import PlayStatus, STATE_STARTING, STATE_BUFFERING, STATE_PLAYING, skin_osd_enabled
 from lib.player import TorrestPlayer, PlayerCancelledError
 from lib.prebuffer import PreBuffer
+from lib.stream_watch import StreamWatch
 from lib.torrest.api import Torrest, TorrestError, STATUS_SEEDING, STATUS_PAUSED, STATUS_QUEUED
 from lib.utils import sizeof_fmt, ThreadLocal
 
@@ -731,7 +732,8 @@ def wait_for_buffering_completion(info_hash, file_id):
 @check_playable
 def play(info_hash, file_id):
     serve_url = api.serve_url(info_hash, file_id)
-    name = api.file_info(info_hash, file_id).name
+    file_info = api.file_info(info_hash, file_id)
+    name = file_info.name
 
     file_li = ListItem(name, path=serve_url)
     info_labels = {"title": name}
@@ -758,6 +760,10 @@ def play(info_hash, file_id):
 
     # The skin shows the download status in its own OSD: no overlay, publish it instead
     skin_osd = skin_osd_enabled()
+    stream_watch = None
+    if settings.pause_when_behind() and is_video(name):
+        stream_watch = StreamWatch(serve_url, file_info.length, settings.get_resume_ahead(),
+                                   complete_handler=lambda: api.file_status(info_hash, file_id).progress >= 100)
     try:
         with TorrestPlayer(
                 text_handler=(lambda: get_status_labels(info_hash) + (name,))
@@ -767,6 +773,7 @@ def play(info_hash, file_id):
                 active_handler=lambda: not status.superseded(),
                 cancel_handler=status.cancel_requested,
                 on_close_handler=on_close,
+                stream_watch=stream_watch,
         ) as player:
             player.handle_events(url=serve_url)
     except PlayerCancelledError:
