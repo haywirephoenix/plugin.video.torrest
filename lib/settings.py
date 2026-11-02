@@ -62,6 +62,14 @@ def get_buffering_timeout():
     return get_int_setting("buffer_timeout") if get_boolean_setting("limit_buffer_timeout") else 0
 
 
+def keep_packs():
+    return get_boolean_setting("keep_packs")
+
+
+def delete_watched_from_packs():
+    return get_boolean_setting("delete_watched_from_packs")
+
+
 def pause_when_behind():
     return get_boolean_setting("pause_when_behind")
 

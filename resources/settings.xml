@@ -179,6 +179,14 @@
                     </constraints>
                     <control type="spinner" format="string"/>
                 </setting>
+                <setting id="keep_packs" type="boolean" label="30282" help="30283" parent="on_playback_stop">
+                    <level>0</level>
+                    <default>true</default>
+                    <dependencies>
+                        <dependency type="visible" setting="on_playback_stop" operator="!is">2</dependency>
+                    </dependencies>
+                    <control type="toggle"/>
+                </setting>
                 <setting id="delete_unstarted" type="boolean" label="30096">
                     <level>0</level>
                     <default>true</default>
@@ -218,6 +226,14 @@
                     <control type="slider" format="integer">
                         <popup>false</popup>
                     </control>
+                </setting>
+                <setting id="delete_watched_from_packs" type="boolean" label="30284" help="30285" parent="delete_watched">
+                    <level>0</level>
+                    <default>false</default>
+                    <dependencies>
+                        <dependency type="visible" setting="delete_watched">true</dependency>
+                    </dependencies>
+                    <control type="toggle"/>
                 </setting>
                 <!-- For the two rules above: delete straight away, or ask first -->
                 <setting id="delete_action" type="integer" label="30252">

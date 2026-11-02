@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import re
@@ -16,8 +17,8 @@ from xbmcplugin import addDirectoryItem, endOfDirectory, setResolvedUrl
 
 from lib import settings, trackers
 from lib.dialog import DialogInsert
-from lib.kodi import ADDON_ID, ADDON_PATH, ADDON_NAME, translate, notification, set_logger, refresh, show_picture, \
-    busy_dialog, close_busy_dialog
+from lib.kodi import ADDON_DATA, ADDON_ID, ADDON_PATH, ADDON_NAME, translate, notification, set_logger, refresh, \
+    show_picture, busy_dialog, close_busy_dialog
 from lib.kodi_formats import is_music, is_picture, is_video, is_text
 from lib.play_status import PlayStatus, STATE_STARTING, STATE_BUFFERING, STATE_PLAYING, skin_osd_enabled
 from lib.player import TorrestPlayer, PlayerCancelledError
@@ -204,10 +205,23 @@ def handle_player_stop(info_hash, name=None, watched=None, added=False, initial_
         logging.info("Keeping %s: playing again", name)
         return
 
-    # Only the whole torrent can be deleted: never a pack (a season, say) for one of its videos
-    if is_pack(info_hash):
-        logging.info("Keeping %s: more than one video in it", name)
+    # The whole torrent is never deleted for one of a pack's videos (a season's episode, say); with
+    # its setting, an episode watched to the end has just its own file deleted
+    pack = is_pack(info_hash)
+    if pack:
         unstarted = watched_to_end = False
+        if (settings.delete_watched() and settings.delete_watched_from_packs() and watched is not None
+                and watched >= settings.get_watched_percent()):
+            if (settings.get_delete_action() == settings.DeleteAction.AUTO
+                    or ask_to_delete(name, initial_delay, listing_timeout, message=30286)):
+                if play_status is not None and play_status.torrent_taken(info_hash):
+                    logging.info("Keeping %s: played again while asking", name)
+                    return
+                delete_pack_file(info_hash, name)
+            else:
+                logging.info("Keeping %s in its pack: not deleted when asked", name)
+        else:
+            logging.info("Keeping %s: more than one video in it", name)
     else:
         unstarted = added if watched is None else watched < settings.get_unstarted_percent()
         watched_to_end = watched is not None and watched >= settings.get_watched_percent()
@@ -225,6 +239,8 @@ def handle_player_stop(info_hash, name=None, watched=None, added=False, initial_
             remove_torrent_files(info_hash)
             return
         logging.info("Keeping %s (%s): not deleted when asked", name, reason)
+    elif pack and settings.keep_packs():
+        pass  # the stop action below would delete every episode with it
     else:
         stop_action = settings.get_on_playback_stop_action()
         if (stop_action == settings.PlaybackStopAction.DELETE
@@ -250,7 +266,7 @@ def handle_player_stop(info_hash, name=None, watched=None, added=False, initial_
             logging.debug("Failed to pause %s: %s", info_hash, e)
 
 
-def ask_to_delete(name, initial_delay, listing_timeout):
+def ask_to_delete(name, initial_delay, listing_timeout, message=30241):
     # Once the video has closed and the window Kodi goes back to is up (not over the last frame,
     # which stuttered and left trails), and after its listing's busy dialog
     start_time = time.time()
@@ -261,7 +277,7 @@ def ask_to_delete(name, initial_delay, listing_timeout):
     start_time = time.time()
     while getCondVisibility("Window.IsActive(busydialog)") and not 0 < listing_timeout < time.time() - start_time:
         sleep(100)
-    return Dialog().yesno(ADDON_NAME, name + "\n" + translate(30241))
+    return Dialog().yesno(ADDON_NAME, name + "\n" + translate(message))
 
 
 def wait_for_daemon():
@@ -280,6 +296,46 @@ def wait_for_daemon():
 def is_pack(info_hash):
     min_size = settings.get_min_candidate_size() * 1024 * 1024
     return sum(1 for f in api.files(info_hash, status=False) if is_video(f.path) and f.length >= min_size) > 1
+
+
+def download_path():
+    """The daemon's download folder (the settings file the service writes for it)."""
+    with open(os.path.join(ADDON_DATA, "settings.json")) as f:
+        return json.load(f)["download_path"]
+
+
+def delete_pack_file(info_hash, name):
+    """
+    Deletes one video of a pack from disk, keeping the rest. The daemon would go on thinking its
+    pieces are there (and a read of a missing file stops the torrent), so the torrent is added
+    again from its magnet, which checks what's on disk: the deleted file's pieces, and a piece it
+    shared with a neighbour, are missing then and download again once wanted (a neighbour's play).
+    The files it was downloading (one asked for ahead) are asked for again.
+    """
+    files = api.files(info_hash, status=True)
+    target = next((f for f in files if f.name == name), None)
+    if target is None:
+        logging.warning("Not deleting %s: not found in %s", name, info_hash)
+        return
+    wanted = [f.id for f in files if f.id != target.id and f.status.priority > 0 and f.status.progress < 100]
+    path = os.path.join(download_path(), target.path)
+    api.remove_torrent(info_hash, delete=False)
+    try:
+        os.remove(path)
+        logging.info("Deleted %s from its pack: watched to the end", name)
+    except OSError as e:
+        logging.warning("Failed to delete %s: %s", path, e)
+    api.add_magnet(with_trackers("magnet:?xt=urn:btih:{}".format(info_hash)), ignore_duplicate=True, download=False)
+    if not wanted:
+        return
+    # Files can only be asked for once the metadata (the file list) is in again
+    timeout, start, monitor = max(settings.get_metadata_timeout(), 60), time.time(), Monitor()
+    while not api.torrent_status(info_hash).has_metadata:
+        if monitor.waitForAbort(0.5) or time.time() - start > timeout:
+            logging.warning("No metadata for %s after adding it again: not asking for %s", info_hash, wanted)
+            return
+    for file_id in wanted:
+        api.download_file(info_hash, file_id, buffer=False)
 
 
 def remove_torrent_files(info_hash):

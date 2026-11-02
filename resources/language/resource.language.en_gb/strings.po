@@ -739,3 +739,23 @@ msgstr ""
 msgctxt "#30281"
 msgid "Seconds of video that must be downloaded past the play position before a paused video carries on. Higher pauses less often but for longer; lower carries on sooner but may pause again soon on a slow torrent."
 msgstr ""
+
+msgctxt "#30282"
+msgid "Keep packs"
+msgstr ""
+
+msgctxt "#30283"
+msgid "A torrent with more than one video (a season pack) is never deleted when playback stops, so one episode can't take the others with it. Off: the action above deletes the whole pack too."
+msgstr ""
+
+msgctxt "#30284"
+msgid "Delete watched episodes from packs"
+msgstr ""
+
+msgctxt "#30285"
+msgid "An episode watched to the end in a pack has its own file deleted; the rest of the pack is kept. The torrent is then added again, which checks what is on disk (this takes a while for a big pack): a piece the episode shared with its neighbours downloads again when they play. Off: a pack is always kept whole."
+msgstr ""
+
+msgctxt "#30286"
+msgid "Do you want to delete this episode's file? The rest of the pack is kept."
+msgstr ""
