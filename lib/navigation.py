@@ -318,6 +318,21 @@ def download_path():
         return json.load(f)["download_path"]
 
 
+def local_file(info_hash, file_id, info):
+    """The file on disk when it's fully downloaded (Kodi reads it straight from there, not through
+    the daemon's HTTP server, which it caches like a network stream: a seek past its cache waited
+    for it to fill again), else None. Its size is checked as well as the daemon's count: a file
+    left out of a pack can count as done while its pieces sit in the torrent's parts file."""
+    try:
+        if api.file_status(info_hash, file_id).total_done < info.length:
+            return None
+        path = os.path.join(download_path(), info.path)
+        return path if os.path.isfile(path) and os.path.getsize(path) == info.length else None
+    except (OSError, KeyError, ValueError, requests.exceptions.RequestException) as e:
+        logging.debug("No local file for %s: %s", info.name, e)
+        return None
+
+
 def delete_pack_file(info_hash, name):
     """
     Deletes one video of a pack from disk, keeping the rest. The daemon would go on thinking its
@@ -855,8 +870,13 @@ def play(info_hash, file_id):
     serve_url = api.serve_url(info_hash, file_id)
     file_info = api.file_info(info_hash, file_id)
     name = file_info.name
+    # Downloaded: Kodi plays the file itself
+    local = local_file(info_hash, file_id, file_info)
+    play_path = local or serve_url
+    if local:
+        logging.info("Playing %s from disk", name)
 
-    file_li = ListItem(name, path=serve_url)
+    file_li = ListItem(name, path=play_path)
     info_labels = {"title": name}
     if is_video(name):
         file_li.setInfo("video", info_labels)
@@ -898,7 +918,7 @@ def play(info_hash, file_id):
                 on_close_handler=on_close,
                 stream_watch=stream_watch,
         ) as player:
-            player.handle_events(url=serve_url)
+            player.handle_events(url=play_path)
     except PlayerCancelledError:
         logging.info("Loading screen left before the player started: not playing %s", name)
     except Exception as e:
