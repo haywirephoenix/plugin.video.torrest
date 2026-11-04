@@ -309,7 +309,11 @@ def wait_for_daemon():
 
 def is_pack(info_hash):
     min_size = settings.get_min_candidate_size() * 1024 * 1024
-    return sum(1 for f in api.files(info_hash, status=False) if is_video(f.path) and f.length >= min_size) > 1
+    try:
+        files = api.files(info_hash, status=False)
+    except TorrestError:  # no metadata yet (a play cancelled while waiting for it): no files, no pack
+        return False
+    return sum(1 for f in files if is_video(f.path) and f.length >= min_size) > 1
 
 
 def download_path():
@@ -596,10 +600,12 @@ def display_text(info_hash, file_id):
 @query_arg("file_id", required=False, arg_type=Types.integer)
 @query_arg("index", required=False, arg_type=Types.integer)
 @query_arg("buffer", required=False, arg_type=Types.boolean)
-def play_url(url, file_id=None, index=None, buffer=True):
+@query_arg("season", required=False, arg_type=Types.integer)
+@query_arg("episode", required=False, arg_type=Types.integer)
+def play_url(url, file_id=None, index=None, buffer=True, season=None, episode=None):
     r = requests.get(url, stream=True)
     info_hash = add_for_play(lambda: api.add_torrent_obj(r.raw, ignore_duplicate=True, download=False))
-    play_info_hash(info_hash, file_id=index if file_id is None else file_id, buffer=buffer)
+    play_info_hash(info_hash, file_id=index if file_id is None else file_id, buffer=buffer, season=season, episode=episode)
 
 
 @plugin.route("/play_magnet")
@@ -608,11 +614,14 @@ def play_url(url, file_id=None, index=None, buffer=True):
 @query_arg("file_id", required=False, arg_type=Types.integer)
 @query_arg("index", required=False, arg_type=Types.integer)
 @query_arg("buffer", required=False, arg_type=Types.boolean)
-def play_magnet(magnet, file_id=None, index=None, buffer=True):
+@query_arg("season", required=False, arg_type=Types.integer)
+@query_arg("episode", required=False, arg_type=Types.integer)
+def play_magnet(magnet, file_id=None, index=None, buffer=True, season=None, episode=None):
+    """season / episode: the episode wanted (Ultra Player), so a pack plays that one (wanted_file)."""
     global play_magnet_uri
     magnet = play_magnet_uri = with_trackers(magnet)
     info_hash = add_for_play(lambda: api.add_magnet(magnet, ignore_duplicate=True, download=False))
-    play_info_hash(info_hash, file_id=index if file_id is None else file_id, buffer=buffer)
+    play_info_hash(info_hash, file_id=index if file_id is None else file_id, buffer=buffer, season=season, episode=episode)
 
 
 @plugin.route("/download_magnet")
@@ -620,14 +629,17 @@ def play_magnet(magnet, file_id=None, index=None, buffer=True):
 @query_arg("file_id", required=False, arg_type=Types.integer)
 @query_arg("index", required=False, arg_type=Types.integer)
 @query_arg("silent", required=False, arg_type=Types.boolean)
-def download_magnet(magnet, file_id=None, index=None, silent=False):
+@query_arg("season", required=False, arg_type=Types.integer)
+@query_arg("episode", required=False, arg_type=Types.integer)
+def download_magnet(magnet, file_id=None, index=None, silent=False, season=None, episode=None):
     """Downloads a magnet's torrent, or just one of its files (file_id / index), without playing
     it, as the Torrents menu's Download does: for other add-ons (Ultra Player's Download). It's
     then in Torrents, where its progress shows; a later play of it streams what's there. silent:
-    no "added" notification (Ultra Player's next episode, fetched ahead on its own)."""
+    no "added" notification (Ultra Player's next episode, fetched ahead on its own). season /
+    episode: the episode wanted, so a pack's file is that one (wanted_file)."""
     info_hash = api.add_magnet(with_trackers(magnet), ignore_duplicate=True, download=False)
     file_id = index if file_id is None else file_id
-    if file_id is None:
+    if file_id is None and episode is None:
         api.download_torrent(info_hash)
     else:
         # A file can only be picked once the torrent's metadata (its file list) is in.
@@ -636,7 +648,11 @@ def download_magnet(magnet, file_id=None, index=None, silent=False):
             if monitor.waitForAbort(0.5) or (0 < timeout < time.time() - start):
                 notification(translate(30238))
                 return
-        api.download_file(info_hash, file_id, buffer=False)
+        file_id = wanted_file(info_hash, api.files(info_hash, status=False), file_id, season, episode)
+        if file_id is None:
+            api.download_torrent(info_hash)
+        else:
+            api.download_file(info_hash, file_id, buffer=False)
     if not silent:
         notification(translate(30243), time=2000)
 
@@ -693,16 +709,53 @@ class QueueWatch(object):
 @query_arg("file_id", required=False, arg_type=Types.integer)
 @query_arg("index", required=False, arg_type=Types.integer)
 @query_arg("buffer", required=False, arg_type=Types.boolean)
-def play_file(path, file_id=None, index=None, buffer=True):
+@query_arg("season", required=False, arg_type=Types.integer)
+@query_arg("episode", required=False, arg_type=Types.integer)
+def play_file(path, file_id=None, index=None, buffer=True, season=None, episode=None):
     info_hash = add_for_play(lambda: api.add_torrent(path, ignore_duplicate=True, download=False))
-    play_info_hash(info_hash, file_id=index if file_id is None else file_id, buffer=buffer)
+    play_info_hash(info_hash, file_id=index if file_id is None else file_id, buffer=buffer, season=season, episode=episode)
+
+
+# An episode's numbers in a file's name: S01E02 (S01.E02, s1e2), else 1x02 (as Ultra Player reads them)
+_SXE = re.compile(r"(?<![a-z0-9])s(\d{1,2})[ ._-]?e(\d{1,3})(?!\d)", re.IGNORECASE)
+_NXN = re.compile(r"(?<!\d)(\d{1,2})x(\d{2,3})(?!\d)", re.IGNORECASE)
+
+
+def episode_of(path):
+    """(season, episode) a file's name says it is, or None."""
+    base = (path or "").replace("\\", "/").rsplit("/", 1)[-1]
+    found = _SXE.search(base) or _NXN.search(base)
+    return (int(found.group(1)), int(found.group(2))) if found else None
+
+
+def wanted_file(info_hash, files, file_id, season, episode):
+    """The file to play when an episode is wanted: the one asked for, unless its name says it's
+    another episode (a source's index into a pack can be wrong), then the pack's video named as
+    the wanted one; with no index, that video. Samples are passed over; file_id is kept when no
+    video is named as the wanted episode."""
+    if season is None or episode is None:
+        return file_id
+    wanted = (season, episode)
+    chosen = next((f for f in files if f.id == file_id), None) if file_id is not None else None
+    if chosen is not None and episode_of(chosen.path) in (None, wanted):
+        return file_id
+    match = next((f for f in files if is_video(f.path) and "sample" not in f.path.lower()
+                  and episode_of(f.path) == wanted), None)
+    if match is None:
+        return file_id
+    if chosen is not None:
+        logging.warning("File %s in %s is %s, not S%02dE%02d: playing %s instead",
+                        file_id, info_hash, chosen.path, season, episode, match.path)
+    return match.id
 
 
 @plugin.route("/play_info_hash/<info_hash>")
 @query_arg("buffer", required=False, arg_type=Types.boolean)
 @query_arg("file_id", required=False, arg_type=Types.integer)
+@query_arg("season", required=False, arg_type=Types.integer)
+@query_arg("episode", required=False, arg_type=Types.integer)
 @check_playable
-def play_info_hash(info_hash, file_id=None, buffer=True):
+def play_info_hash(info_hash, file_id=None, buffer=True, season=None, episode=None):
     global play_torrent
     play_torrent = info_hash
     play_status.set_torrent(info_hash)
@@ -721,6 +774,7 @@ def play_info_hash(info_hash, file_id=None, buffer=True):
             logging.warning("File %s in %s isn't a video (%s), choosing a file instead",
                             file_id, info_hash, chosen.path)
             file_id = None
+    file_id = wanted_file(info_hash, api.files(info_hash, status=False), file_id, season, episode)
 
     if file_id is None:
         files = api.files(info_hash, status=False)
