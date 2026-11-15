@@ -278,8 +278,14 @@ class TorrentManager(WindowXML):
         sort_by(torrents, TORRENT_ORDERS[TORRENT_ORDER], self._added_times)
         for torrent in torrents:
             rows.append(Row("torrent", torrent.info_hash, torrent.info_hash, 0, torrent))
-            if torrent.info_hash in expanded:
-                rows.extend(self._children(torrent.info_hash, "", 1, expanded, torrent.status.paused))
+            # Without its metadata (a magnet still being looked up) a torrent has no files to list:
+            # the daemon answers its listings with an error
+            if torrent.info_hash in expanded and torrent.status.has_metadata:
+                try:
+                    rows.extend(self._children(torrent.info_hash, "", 1, expanded, torrent.status.paused))
+                except TorrestError as e:
+                    # One torrent's listing failing leaves the rest of the table as it is
+                    logging.debug("Torrent manager: no listing for %s (%s)", torrent.info_hash, e)
         return rows
 
     def _children(self, info_hash, folder, level, expanded, paused):
