@@ -605,7 +605,8 @@ def display_text(info_hash, file_id):
 def play_url(url, file_id=None, index=None, buffer=True, season=None, episode=None):
     r = requests.get(url, stream=True)
     info_hash = add_for_play(lambda: api.add_torrent_obj(r.raw, ignore_duplicate=True, download=False))
-    play_info_hash(info_hash, file_id=index if file_id is None else file_id, buffer=buffer, season=season, episode=episode)
+    play_info_hash(info_hash, file_id=index if file_id is None else file_id, buffer=buffer,
+                   season=season, episode=episode)
 
 
 @plugin.route("/play_magnet")
@@ -621,7 +622,8 @@ def play_magnet(magnet, file_id=None, index=None, buffer=True, season=None, epis
     global play_magnet_uri
     magnet = play_magnet_uri = with_trackers(magnet)
     info_hash = add_for_play(lambda: api.add_magnet(magnet, ignore_duplicate=True, download=False))
-    play_info_hash(info_hash, file_id=index if file_id is None else file_id, buffer=buffer, season=season, episode=episode)
+    play_info_hash(info_hash, file_id=index if file_id is None else file_id, buffer=buffer,
+                   season=season, episode=episode)
 
 
 @plugin.route("/download_magnet")
@@ -713,7 +715,8 @@ class QueueWatch(object):
 @query_arg("episode", required=False, arg_type=Types.integer)
 def play_file(path, file_id=None, index=None, buffer=True, season=None, episode=None):
     info_hash = add_for_play(lambda: api.add_torrent(path, ignore_duplicate=True, download=False))
-    play_info_hash(info_hash, file_id=index if file_id is None else file_id, buffer=buffer, season=season, episode=episode)
+    play_info_hash(info_hash, file_id=index if file_id is None else file_id, buffer=buffer,
+                   season=season, episode=episode)
 
 
 # An episode's numbers in a file's name: S01E02 (S01.E02, s1e2), else 1x02 (as Ultra Player reads them)
