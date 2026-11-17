@@ -1,6 +1,6 @@
 from xbmc import getCondVisibility
 
-from lib.kodi import get_int_setting, get_boolean_setting, get_setting, set_boolean_setting
+from lib.kodi import get_int_setting, get_boolean_setting, get_setting, set_boolean_setting, set_setting
 
 ULTRA_PLAYER_ID = "plugin.video.ultra.player"
 
@@ -35,6 +35,10 @@ class DeleteAction:
 
 def get_port():
     return get_int_setting("port")
+
+
+def set_port(value):
+    set_setting("port", str(value))
 
 
 def show_daemon_notification():

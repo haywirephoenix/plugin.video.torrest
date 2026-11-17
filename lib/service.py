@@ -1,6 +1,7 @@
 import logging
 import os
 import shutil
+import socket
 import threading
 import time
 
@@ -28,6 +29,28 @@ class AbortRequestedError(Exception):
 
 class DaemonTimeoutError(Exception):
     pass
+
+
+def port_free(port):
+    """Whether the daemon could listen on the port: Windows reserves port ranges (Hyper-V, WSL, Docker) that
+    change on reboot, and a daemon told to use a reserved port dies on start ("Couldn't bind")."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.bind(("0.0.0.0", port))
+        return True
+    except (OSError, socket.error):
+        return False
+    finally:
+        s.close()
+
+
+def free_port():
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+    finally:
+        s.close()
 
 
 class DaemonMonitor(xbmc.Monitor):
@@ -114,12 +137,30 @@ class DaemonMonitor(xbmc.Monitor):
 
         return True
 
+    def _usable_port(self, daemon_stopped=True):
+        """The port setting, or a free port saved in its place when the daemon could not listen on it."""
+        port = settings.get_port()
+        if not daemon_stopped and port == self._daemon.get_config("port"):
+            return port  # the running daemon holds it
+        if not port_free(port):
+            new_port = free_port()
+            logging.warning("Port %d can't be used (taken or reserved by Windows); using %d", port, new_port)
+            # The settings-changed call this sets off finds the port already in use by the daemon
+            self._daemon.set_config("port", new_port)
+            settings.set_port(new_port)
+            return new_port
+        return port
+
     def onSettingsChanged(self):
         with self._lock:
             port_changed = enabled_changed = False
 
-            port = settings.get_port()
-            if port != self._daemon.get_config("port"):
+            old_port = self._daemon.get_config("port")
+            if settings.service_enabled():
+                port = self._usable_port(daemon_stopped=not self._enabled)
+            else:
+                port = settings.get_port()
+            if port != old_port:
                 self._daemon.set_config("port", port)
                 port_changed = True
 
@@ -175,6 +216,7 @@ class DaemonMonitor(xbmc.Monitor):
                             logging.info("Removing old settings file")
                             os.remove(self._settings_path)
 
+                        self._usable_port()
                         self._daemon.start()
 
                         try:
