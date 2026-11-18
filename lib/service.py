@@ -1,3 +1,4 @@
+import contextlib
 import logging
 import os
 import shutil
@@ -64,7 +65,11 @@ class DaemonMonitor(xbmc.Monitor):
 
     def __init__(self):
         super(DaemonMonitor, self).__init__()
-        self._lock = threading.Lock()
+        # Reentrant: Kodi delivers onSettingsChanged on the thread holding it, at its next Kodi call, after the
+        # service writes a setting itself (the port); a plain lock waited for itself there forever
+        self._lock = threading.RLock()
+        self._busy = False
+        self._settings_pending = False
         self._settings_path = os.path.join(kodi.ADDON_DATA, self.settings_name)
         self._log_path = os.path.join(kodi.ADDON_DATA, self.log_name)
         self._enabled = None
@@ -145,39 +150,62 @@ class DaemonMonitor(xbmc.Monitor):
         if not port_free(port):
             new_port = free_port()
             logging.warning("Port %d can't be used (taken or reserved by Windows); using %d", port, new_port)
-            # The settings-changed call this sets off finds the port already in use by the daemon
+            # The settings-changed call this sets off runs after the current work and finds the port in use
             self._daemon.set_config("port", new_port)
             settings.set_port(new_port)
             return new_port
         return port
 
+    @contextlib.contextmanager
+    def _exclusive(self):
+        """Holds the lock; a settings change Kodi delivers meanwhile is applied once the work is done."""
+        with self._lock:
+            self._busy = True
+            try:
+                yield
+                while self._settings_pending:
+                    self._settings_pending = False
+                    try:
+                        self._apply_settings()
+                    except (DaemonTimeoutError, requests.exceptions.RequestException) as e:
+                        logging.error("Failed applying changed settings: %s", e)
+            finally:
+                self._busy = False
+
     def onSettingsChanged(self):
         with self._lock:
-            port_changed = enabled_changed = False
+            if self._busy:
+                self._settings_pending = True
+                return
+            with self._exclusive():
+                self._apply_settings()
 
-            old_port = self._daemon.get_config("port")
-            if settings.service_enabled():
-                port = self._usable_port(daemon_stopped=not self._enabled)
-            else:
-                port = settings.get_port()
-            if port != old_port:
-                self._daemon.set_config("port", port)
-                port_changed = True
+    def _apply_settings(self):
+        port_changed = enabled_changed = False
 
-            enabled = settings.service_enabled()
-            if enabled != self._enabled:
-                self._enabled = enabled
-                enabled_changed = True
+        old_port = self._daemon.get_config("port")
+        if settings.service_enabled():
+            port = self._usable_port(daemon_stopped=not self._enabled)
+        else:
+            port = settings.get_port()
+        if port != old_port:
+            self._daemon.set_config("port", port)
+            port_changed = True
 
-            if self._enabled:
-                if port_changed and not enabled_changed:
-                    self._daemon.stop()
-                if port_changed or enabled_changed:
-                    self._daemon.start()
-                    self._wait(timeout=settings.get_daemon_timeout(), notification=True)
-                self._update_daemon_settings()
-            elif enabled_changed:
+        enabled = settings.service_enabled()
+        if enabled != self._enabled:
+            self._enabled = enabled
+            enabled_changed = True
+
+        if self._enabled:
+            if port_changed and not enabled_changed:
                 self._daemon.stop()
+            if port_changed or enabled_changed:
+                self._daemon.start()
+                self._wait(timeout=settings.get_daemon_timeout(), notification=True)
+            self._update_daemon_settings()
+        elif enabled_changed:
+            self._daemon.stop()
 
     def handle_crashes(self, max_crashes=5, max_consecutive_crash_time=20):
         crash_count = 0
@@ -188,7 +216,7 @@ class DaemonMonitor(xbmc.Monitor):
             if self._daemon.poll() is None:
                 continue
 
-            with self._lock:
+            with self._exclusive():
                 if self._enabled and self._daemon.poll() is not None:
                     logging.warning("Deamon crashed")
                     kodi.notification(kodi.translate(30105))
