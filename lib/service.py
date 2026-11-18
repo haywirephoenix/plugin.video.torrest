@@ -37,6 +37,10 @@ def port_free(port):
     change on reboot, and a daemon told to use a reserved port dies on start ("Couldn't bind")."""
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
+        if os.name != "nt":
+            # Like the daemon: connections a daemon just closed on the port (TIME_WAIT) don't keep it from listening.
+            # On Windows this option would let it bind a port another program listens on.
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind(("0.0.0.0", port))
         return True
     except (OSError, socket.error):
@@ -147,14 +151,42 @@ class DaemonMonitor(xbmc.Monitor):
         port = settings.get_port()
         if not daemon_stopped and port == self._daemon.get_config("port"):
             return port  # the running daemon holds it
-        if not port_free(port):
+        if not port_free(port) and not self._shutdown_leftover(port):
             new_port = free_port()
-            logging.warning("Port %d can't be used (taken or reserved by Windows); using %d", port, new_port)
+            logging.warning("Port %d can't be used (taken or reserved); using %d", port, new_port)
             # The settings-changed call this sets off runs after the current work and finds the port in use
             self._daemon.set_config("port", new_port)
             settings.set_port(new_port)
             return new_port
         return port
+
+    def _shutdown_leftover(self, port, wait=10):
+        """Shuts down a daemon an earlier Kodi session left running on the port (Kodi killed, crashed or hung), so the
+        port can be used again: the pid file can't reach it under flatpak, where each sandbox numbers its processes on
+        its own. Only a daemon downloading to this profile's path: another Kodi's daemon or another program is left."""
+        url = "http://127.0.0.1:{}/".format(port)
+        try:
+            r = requests.get(url + self._settings_get_uri, timeout=2)
+            daemon_settings = r.json() if r.status_code == 200 else None
+        except (requests.exceptions.RequestException, ValueError):
+            return False
+        if not isinstance(daemon_settings, dict) or \
+                daemon_settings.get("download_path") != self._get_kodi_settings()["download_path"]:
+            return False
+
+        logging.warning("Shutting down the daemon left running on port %d", port)
+        try:
+            requests.get(url + "shutdown", timeout=2)
+        except requests.exceptions.RequestException:
+            pass  # it may close the connection as it shuts down
+        start = time.time()
+        while time.time() - start < wait:  # it saves its torrents' state before exiting
+            if port_free(port):
+                return True
+            if self.waitForAbort(0.5):
+                raise AbortRequestedError("Abort requested")
+        logging.error("The daemon left running on port %d didn't shut down", port)
+        return False
 
     @contextlib.contextmanager
     def _exclusive(self):
