@@ -337,6 +337,47 @@ def local_file(info_hash, file_id, info):
         return None
 
 
+def damaged_on_disk(path, length, window=16384):
+    """Whether a downloaded file's start or end on disk is all zeros. libtorrent can count a piece
+    as had that never reached the file (one shared with a neighbouring file, moved out of the
+    torrent's parts file when the daemon was killed): a video starts with its header (and an MP4
+    often ends with its index), never with zeros, and Kodi can't open it then."""
+    window = min(window, length)
+    with open(path, "rb") as f:
+        head = f.read(window)
+        f.seek(length - window)
+        tail = f.read(window)
+    return not head.strip(b"\0") or not tail.strip(b"\0")
+
+
+def check_again(info_hash, file_id, info):
+    """
+    When the daemon counts the file as downloaded but it's damaged on disk (damaged_on_disk), the
+    torrent is removed (keeping its data) and added again from its magnet: with no resume data
+    libtorrent checks what's on disk, finds the damaged piece missing and downloads it again.
+    Returns the other files it was downloading, to ask for again once its metadata is in, or None
+    when the file is fine (or not downloaded).
+    """
+    try:
+        if api.file_status(info_hash, file_id).total_done < info.length:
+            return None
+        path = os.path.join(download_path(), info.path)
+        if not os.path.isfile(path) or os.path.getsize(path) != info.length:
+            return None
+        if not damaged_on_disk(path, info.length):
+            return None
+    except (OSError, KeyError, ValueError) as e:
+        logging.debug("Not checking %s on disk: %s", info.name, e)
+        return None
+    logging.warning("%s is downloaded but missing data on disk: checking its torrent's files again", info.name)
+    wanted = [f.id for f in api.files(info_hash, status=True)
+              if f.id != file_id and f.status.priority > 0 and f.status.progress < 100]
+    api.remove_torrent(info_hash, delete=False)
+    api.add_magnet(play_magnet_uri or with_trackers("magnet:?xt=urn:btih:{}".format(info_hash)),
+                   ignore_duplicate=True, download=False)
+    return wanted
+
+
 def delete_pack_file(info_hash, name):
     """
     Deletes one video of a pack from disk, keeping the rest. The daemon would go on thinking its
@@ -927,6 +968,14 @@ def play(info_hash, file_id):
     serve_url = api.serve_url(info_hash, file_id)
     file_info = api.file_info(info_hash, file_id)
     name = file_info.name
+    wanted = check_again(info_hash, file_id, file_info)
+    if wanted is not None:
+        # Streamed once the check reaches it, the missing piece downloading first
+        wait_for_metadata(info_hash)
+        for wanted_id in wanted:
+            api.download_file(info_hash, wanted_id, buffer=False)
+        api.download_file(info_hash, file_id, buffer=False)
+        wait_for_buffering_completion(info_hash, file_id)
     # Downloaded: Kodi plays the file itself
     local = local_file(info_hash, file_id, file_info)
     play_path = local or serve_url
